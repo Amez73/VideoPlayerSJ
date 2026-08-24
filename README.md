@@ -4,7 +4,7 @@ Android video player app.
 
 ## Download the latest APK
 
-Every push to `main` automatically builds a fresh debug APK via GitHub Actions.
+Every push to `master` automatically builds a fresh debug APK via GitHub Actions.
 
 **On your phone**, open this link in a browser and download `app-debug.apk`:
 
