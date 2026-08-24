@@ -19,6 +19,15 @@ class MainActivity : AppCompatActivity() {
     private val requestNotificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* no-op either way */ }
 
+    /** Set by the player screen so it can enter picture-in-picture when the user leaves the app.
+     * Only needed below Android 12, which can auto-enter from PictureInPictureParams instead. */
+    var onUserLeaveHintCallback: (() -> Unit)? = null
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        onUserLeaveHintCallback?.invoke()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.PictureInPictureAlt
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -33,8 +34,10 @@ private val SLEEP_TIMER_OPTIONS = listOf(15, 30, 45, 60)
 fun PlayerTopBar(
     title: String,
     isCastAvailable: Boolean,
+    isPipSupported: Boolean,
     sleepTimerMinutes: Int?,
     onBack: () -> Unit,
+    onEnterPip: () -> Unit,
     onSetSleepTimer: (Int?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -51,6 +54,16 @@ fun PlayerTopBar(
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
         }
         Text(title, color = Color.White, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+
+        if (isPipSupported) {
+            IconButton(onClick = onEnterPip) {
+                Icon(
+                    imageVector = Icons.Default.PictureInPictureAlt,
+                    contentDescription = "Picture-in-picture",
+                    tint = Color.White,
+                )
+            }
+        }
 
         IconButton(onClick = { sleepMenuOpen = true }) {
             Icon(

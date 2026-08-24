@@ -1,12 +1,16 @@
 package com.shareef.videoplayersj.ui.player
 
 import android.Manifest
-import android.app.Activity
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.activity.ComponentActivity
+import androidx.activity.PictureInPictureModeChangedInfo
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -36,10 +40,12 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.core.util.Consumer
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.media3.ui.PlayerView
+import com.shareef.videoplayersj.MainActivity
 import com.shareef.videoplayersj.di.AppContainer
 import com.shareef.videoplayersj.ui.player.components.PlayerControls
 import com.shareef.videoplayersj.ui.player.components.PlayerTopBar
@@ -107,6 +113,78 @@ fun PlayerScreen(
 
     val sleepTimerMinutes by viewModel.sleepTimerMinutes.collectAsState()
 
+    // --- Picture-in-picture -------------------------------------------------------------
+    val pipSupported = remember(context) { isPipSupported(context) }
+    var isInPipMode by remember { mutableStateOf(activity?.isInPictureInPictureMode == true) }
+
+    DisposableEffect(activity) {
+        val listener = Consumer<PictureInPictureModeChangedInfo> { info ->
+            isInPipMode = info.isInPictureInPictureMode
+        }
+        activity?.addOnPictureInPictureModeChangedListener(listener)
+        onDispose { activity?.removeOnPictureInPictureModeChangedListener(listener) }
+    }
+
+    val enterPip: () -> Unit = {
+        if (pipSupported && activity != null) {
+            val videoSize = player?.videoSize
+            runCatching {
+                activity.enterPictureInPictureMode(
+                    buildPipParams(
+                        context = context,
+                        isPlaying = uiState.isPlaying,
+                        videoWidth = videoSize?.width ?: 0,
+                        videoHeight = videoSize?.height ?: 0,
+                        autoEnter = true,
+                    ),
+                )
+            }
+        }
+    }
+
+    // Keep the PiP window's play/pause button and aspect ratio in step with playback, and (on
+    // Android 12+) keep auto-enter armed only while something is actually playing.
+    LaunchedEffect(pipSupported, uiState.isPlaying, player) {
+        if (!pipSupported || activity == null) return@LaunchedEffect
+        val videoSize = player?.videoSize
+        runCatching {
+            activity.setPictureInPictureParams(
+                buildPipParams(
+                    context = context,
+                    isPlaying = uiState.isPlaying,
+                    videoWidth = videoSize?.width ?: 0,
+                    videoHeight = videoSize?.height ?: 0,
+                    autoEnter = uiState.isPlaying,
+                ),
+            )
+        }
+    }
+
+    // Below Android 12 there's no auto-enter, so leaving the app has to trigger PiP by hand.
+    DisposableEffect(activity, pipSupported, uiState.isPlaying) {
+        val mainActivity = activity as? MainActivity
+        if (mainActivity != null && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            mainActivity.onUserLeaveHintCallback = { if (uiState.isPlaying) enterPip() }
+        }
+        onDispose { mainActivity?.onUserLeaveHintCallback = null }
+    }
+
+    // The PiP window's play/pause button dispatches this broadcast.
+    DisposableEffect(context) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(receiverContext: Context?, intent: Intent?) {
+                if (intent?.action == ACTION_PIP_TOGGLE_PLAY) viewModel.togglePlayPause()
+            }
+        }
+        ContextCompat.registerReceiver(
+            context,
+            receiver,
+            IntentFilter(ACTION_PIP_TOGGLE_PLAY),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        onDispose { runCatching { context.unregisterReceiver(receiver) } }
+    }
+
     // Transient "-10s"/"+10s" flash after a double-tap. The tick forces the hide timer to restart
     // even when consecutive taps produce the same label.
     var seekFeedback by remember { mutableStateOf<String?>(null) }
@@ -123,7 +201,9 @@ fun PlayerScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .pointerInput(Unit) {
+            .pointerInput(isInPipMode) {
+                // In PiP the window is tiny and the system owns the touch behaviour.
+                if (isInPipMode) return@pointerInput
                 detectTapGestures(
                     onTap = { controlsVisible = !controlsVisible },
                     onDoubleTap = { offset ->
@@ -143,7 +223,7 @@ fun PlayerScreen(
             modifier = Modifier.fillMaxSize(),
         )
 
-        seekFeedback?.let { label ->
+        seekFeedback?.takeIf { !isInPipMode }?.let { label ->
             Text(
                 text = label,
                 color = Color.White,
@@ -155,12 +235,14 @@ fun PlayerScreen(
             )
         }
 
-        if (controlsVisible) {
+        if (controlsVisible && !isInPipMode) {
             PlayerTopBar(
                 title = uiState.title,
                 isCastAvailable = viewModel.isCastAvailable,
+                isPipSupported = pipSupported,
                 sleepTimerMinutes = sleepTimerMinutes,
                 onBack = onBack,
+                onEnterPip = enterPip,
                 onSetSleepTimer = { viewModel.setSleepTimer(it) },
                 modifier = Modifier.align(Alignment.TopCenter),
             )
@@ -189,8 +271,8 @@ fun PlayerScreen(
 }
 
 /** Compose hands out a themed wrapper rather than the Activity itself, so unwrap to reach it. */
-private tailrec fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
+private tailrec fun Context.findActivity(): ComponentActivity? = when (this) {
+    is ComponentActivity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
 }
