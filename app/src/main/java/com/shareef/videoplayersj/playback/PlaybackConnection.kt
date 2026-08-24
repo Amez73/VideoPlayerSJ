@@ -44,6 +44,7 @@ private const val RESUME_MIN_MS = 5_000L
 private const val RESUME_MAX_FRACTION = 0.95
 private const val PROGRESS_SAVE_INTERVAL_MS = 5_000L
 private const val SKIP_BACK_MS = 10_000L
+private const val SKIP_FORWARD_MS = 10_000L
 
 /**
  * The single, app-scoped connection to [PlaybackService]'s [MediaController] — owns the one
@@ -75,6 +76,11 @@ class PlaybackConnection(
 
     private val _nowPlaying = MutableStateFlow<NowPlaying?>(null)
     val nowPlaying: StateFlow<NowPlaying?> = _nowPlaying.asStateFlow()
+
+    private var sleepTimerJob: Job? = null
+    private val _sleepTimerMinutes = MutableStateFlow<Int?>(null)
+    /** Minutes the running sleep timer was set for, or null when none is armed. */
+    val sleepTimerMinutes: StateFlow<Int?> = _sleepTimerMinutes.asStateFlow()
 
     private var castContext: CastContext? = null
     private var castPlayer: CastPlayer? = null
@@ -280,6 +286,15 @@ class PlaybackConnection(
         refreshNowPlaying()
     }
 
+    fun skipForward() {
+        _player.value?.let {
+            val target = it.currentPosition + SKIP_FORWARD_MS
+            val duration = it.duration.coerceAtLeast(0L)
+            it.seekTo(if (duration > 0L) target.coerceAtMost(duration) else target)
+        }
+        refreshNowPlaying()
+    }
+
     fun seekTo(positionMs: Long) {
         _player.value?.let { it.seekTo(positionMs.coerceIn(0L, it.duration.coerceAtLeast(0L))) }
         refreshNowPlaying()
@@ -287,6 +302,22 @@ class PlaybackConnection(
 
     fun setVolume(volume: Float) {
         _player.value?.volume = volume.coerceIn(0f, 1f)
+    }
+
+    /** Pauses playback after [minutes]; null cancels any armed timer. Pauses rather than stops so
+     * the position is kept and playback can be resumed with one tap. */
+    fun setSleepTimer(minutes: Int?) {
+        sleepTimerJob?.cancel()
+        sleepTimerJob = null
+        _sleepTimerMinutes.value = minutes
+        if (minutes == null || minutes <= 0) return
+        sleepTimerJob = scope.launch {
+            delay(minutes * 60_000L)
+            _player.value?.pause()
+            saveProgress(isFinished = false)
+            _sleepTimerMinutes.value = null
+            sleepTimerJob = null
+        }
     }
 
     fun stopAndDismiss() {
@@ -409,6 +440,9 @@ class PlaybackConnection(
         controllerFuture?.let { MediaController.releaseFuture(it) }
         tickerJob?.cancel()
         tickerJob = null
+        sleepTimerJob?.cancel()
+        sleepTimerJob = null
+        _sleepTimerMinutes.value = null
         controller = null
         controllerFuture = null
         pendingConnect = null

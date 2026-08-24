@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.shareef.videoplayersj.data.repository.FolderRepository
 import com.shareef.videoplayersj.data.repository.LibraryRepository
+import com.shareef.videoplayersj.model.ContinueWatchingItem
 import com.shareef.videoplayersj.model.LibraryShow
 import com.shareef.videoplayersj.model.LibraryVideo
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 data class LibraryUiState(
+    val continueWatching: List<ContinueWatchingItem> = emptyList(),
     val shows: List<LibraryShow> = emptyList(),
     val movies: List<LibraryVideo> = emptyList(),
     val isScanning: Boolean = false,
@@ -28,11 +30,17 @@ class LibraryViewModel(
     private val isScanning = MutableStateFlow(false)
 
     val uiState: StateFlow<LibraryUiState> = combine(
+        libraryRepository.observeContinueWatching(),
         libraryRepository.observeShows(),
         libraryRepository.observeUngroupedVideos(),
         isScanning,
-    ) { shows, movies, scanning ->
-        LibraryUiState(shows = shows, movies = movies, isScanning = scanning)
+    ) { continueWatching, shows, movies, scanning ->
+        LibraryUiState(
+            continueWatching = continueWatching,
+            shows = shows,
+            movies = movies,
+            isScanning = scanning,
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LibraryUiState())
 
     fun onFolderPicked(treeUri: Uri, displayName: String) {

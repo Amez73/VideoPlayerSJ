@@ -29,6 +29,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.shareef.videoplayersj.data.saf.SafFolderScanner
 import com.shareef.videoplayersj.di.AppContainer
+import com.shareef.videoplayersj.ui.library.components.ContinueWatchingListItem
 import com.shareef.videoplayersj.ui.library.components.EmptyLibraryState
 import com.shareef.videoplayersj.ui.library.components.MovieListItem
 import com.shareef.videoplayersj.ui.library.components.ShowListItem
@@ -73,16 +74,24 @@ fun LibraryScreen(
             if (uiState.shows.isEmpty() && uiState.movies.isEmpty() && !uiState.isScanning) {
                 EmptyLibraryState(onAddFolder = { folderPicker.launch(null) })
             } else {
+                // Keys are prefixed per section: shows and videos have independent autoincrement
+                // ids, so a bare id collides across sections and LazyColumn rejects duplicate keys.
                 LazyColumn {
+                    if (uiState.continueWatching.isNotEmpty()) {
+                        item { Text("Continue watching", modifier = Modifier.padding(16.dp)) }
+                        items(uiState.continueWatching, key = { "continue-${it.video.id}" }) { item ->
+                            ContinueWatchingListItem(item = item, onClick = { onVideoClick(item.video.id) })
+                        }
+                    }
                     if (uiState.shows.isNotEmpty()) {
                         item { Text("Shows", modifier = Modifier.padding(16.dp)) }
-                        items(uiState.shows, key = { it.id }) { show ->
+                        items(uiState.shows, key = { "show-${it.id}" }) { show ->
                             ShowListItem(show = show, onClick = { onShowClick(show.id) })
                         }
                     }
                     if (uiState.movies.isNotEmpty()) {
                         item { Text("Movies & Other", modifier = Modifier.padding(16.dp)) }
-                        items(uiState.movies, key = { it.id }) { video ->
+                        items(uiState.movies, key = { "movie-${it.id}" }) { video ->
                             MovieListItem(video = video, onClick = { onVideoClick(video.id) })
                         }
                     }

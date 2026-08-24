@@ -13,6 +13,7 @@ import com.shareef.videoplayersj.data.parser.ParsedFileName
 import com.shareef.videoplayersj.data.parser.TitleClusterer
 import com.shareef.videoplayersj.data.saf.SafFolderScanner
 import com.shareef.videoplayersj.data.saf.ScannedFile
+import com.shareef.videoplayersj.model.ContinueWatchingItem
 import com.shareef.videoplayersj.model.LibraryShow
 import com.shareef.videoplayersj.model.LibraryVideo
 import com.shareef.videoplayersj.util.normalizeToTokens
@@ -25,6 +26,7 @@ import kotlinx.coroutines.withContext
 import java.util.IdentityHashMap
 
 private const val SHOW_MATCH_THRESHOLD = 0.75
+private const val CONTINUE_WATCHING_LIMIT = 12
 
 private data class ScannedEpisode(
     val file: ScannedFile,
@@ -55,6 +57,16 @@ class LibraryRepository(
 
     fun observeVideo(videoId: Long): Flow<LibraryVideo?> =
         videoDao.getById(videoId).map { it?.toLibraryVideo() }
+
+    fun observeContinueWatching(limit: Int = CONTINUE_WATCHING_LIMIT): Flow<List<ContinueWatchingItem>> =
+        videoDao.getContinueWatching(limit).map { rows ->
+            rows.map { row ->
+                ContinueWatchingItem(
+                    video = VideoWithProgress(row.video, row.progress).toLibraryVideo(),
+                    showTitle = row.showTitle,
+                )
+            }
+        }
 
     /** Re-walks every picked folder, re-parses filenames, re-clusters into shows, and syncs Room.
      * Only ever runs on an explicit "add folder" or manual refresh — never on cold start. */

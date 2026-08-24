@@ -1,11 +1,9 @@
 package com.shareef.videoplayersj.ui.player.components
 
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Slider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -14,25 +12,35 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.unit.dp
 
+private val TRACK_LENGTH = 132.dp
+private val TOUCH_WIDTH = 40.dp
+
+/**
+ * Compact vertical volume slider for the right edge of the player. Compose has no vertical
+ * Slider, so a normal one is rotated a quarter turn — `requiredWidth` sets its pre-rotation
+ * length independently of the narrow box it sits in, and Compose maps touch events through the
+ * rotation so dragging upward raises the volume.
+ */
 @Composable
 fun VolumeControl(onVolumeChange: (Float) -> Unit, modifier: Modifier = Modifier) {
     var volume by remember { mutableFloatStateOf(1f) }
 
-    Row(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    Box(
+        modifier = modifier.height(TRACK_LENGTH).width(TOUCH_WIDTH),
+        contentAlignment = Alignment.Center,
     ) {
-        Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Volume", tint = Color.White)
         Slider(
             value = volume,
             onValueChange = {
                 volume = it
                 onVolumeChange(it)
             },
-            modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+            modifier = Modifier
+                .requiredWidth(TRACK_LENGTH)
+                .rotate(270f),
         )
     }
 }

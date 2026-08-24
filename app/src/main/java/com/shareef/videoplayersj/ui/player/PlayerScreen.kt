@@ -10,16 +10,19 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -27,8 +30,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -40,6 +45,7 @@ import com.shareef.videoplayersj.ui.player.components.PlayerControls
 import com.shareef.videoplayersj.ui.player.components.PlayerTopBar
 import com.shareef.videoplayersj.ui.player.components.SeekBar
 import com.shareef.videoplayersj.ui.player.components.VolumeControl
+import kotlinx.coroutines.delay
 
 @Composable
 fun PlayerScreen(
@@ -99,14 +105,36 @@ fun PlayerScreen(
         onDispose { activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
     }
 
+    val sleepTimerMinutes by viewModel.sleepTimerMinutes.collectAsState()
+
+    // Transient "-10s"/"+10s" flash after a double-tap. The tick forces the hide timer to restart
+    // even when consecutive taps produce the same label.
+    var seekFeedback by remember { mutableStateOf<String?>(null) }
+    var seekFeedbackOnLeft by remember { mutableStateOf(false) }
+    var seekFeedbackTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(seekFeedbackTick) {
+        if (seekFeedback != null) {
+            delay(650)
+            seekFeedback = null
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-            ) { controlsVisible = !controlsVisible },
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = { controlsVisible = !controlsVisible },
+                    onDoubleTap = { offset ->
+                        val onLeft = offset.x < size.width / 2f
+                        if (onLeft) viewModel.skipBack() else viewModel.skipForward()
+                        seekFeedback = if (onLeft) "− 10s" else "+ 10s"
+                        seekFeedbackOnLeft = onLeft
+                        seekFeedbackTick++
+                    },
+                )
+            },
     ) {
         AndroidView(
             factory = { PlayerView(it).apply { useController = false } },
@@ -115,12 +143,31 @@ fun PlayerScreen(
             modifier = Modifier.fillMaxSize(),
         )
 
+        seekFeedback?.let { label ->
+            Text(
+                text = label,
+                color = Color.White,
+                modifier = Modifier
+                    .align(if (seekFeedbackOnLeft) Alignment.CenterStart else Alignment.CenterEnd)
+                    .padding(horizontal = 40.dp)
+                    .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(16.dp))
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
+
         if (controlsVisible) {
             PlayerTopBar(
                 title = uiState.title,
-                onBack = onBack,
                 isCastAvailable = viewModel.isCastAvailable,
+                sleepTimerMinutes = sleepTimerMinutes,
+                onBack = onBack,
+                onSetSleepTimer = { viewModel.setSleepTimer(it) },
                 modifier = Modifier.align(Alignment.TopCenter),
+            )
+
+            VolumeControl(
+                onVolumeChange = { viewModel.setVolume(it) },
+                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 4.dp),
             )
 
             Column(modifier = Modifier.align(Alignment.BottomCenter)) {
@@ -136,7 +183,6 @@ fun PlayerScreen(
                     onSkipBack = { viewModel.skipBack() },
                     onToggleFullscreen = { isFullscreen = !isFullscreen },
                 )
-                VolumeControl(onVolumeChange = { viewModel.setVolume(it) })
             }
         }
     }

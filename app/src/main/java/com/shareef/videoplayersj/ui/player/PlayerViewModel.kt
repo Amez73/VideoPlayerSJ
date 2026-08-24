@@ -57,9 +57,15 @@ class PlayerViewModel(
         }
     }
 
+    val sleepTimerMinutes: StateFlow<Int?> = playbackConnection.sleepTimerMinutes
+
     fun togglePlayPause() = playbackConnection.togglePlayPause()
 
     fun skipBack() = playbackConnection.skipBack()
+
+    fun skipForward() = playbackConnection.skipForward()
+
+    fun setSleepTimer(minutes: Int?) = playbackConnection.setSleepTimer(minutes)
 
     fun seekTo(positionMs: Long) = playbackConnection.seekTo(positionMs)
 

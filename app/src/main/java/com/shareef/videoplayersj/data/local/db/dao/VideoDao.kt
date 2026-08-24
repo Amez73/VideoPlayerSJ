@@ -16,6 +16,15 @@ data class VideoWithProgress(
     val progress: WatchProgressEntity?,
 )
 
+/** Adds the owning show's title, so "Continue watching" can name the show rather than
+ * showing a bare "S01E02" with no context about what it belongs to. */
+data class VideoWithProgressAndShow(
+    @Embedded val video: VideoEntity,
+    @Relation(parentColumn = "id", entityColumn = "videoId")
+    val progress: WatchProgressEntity?,
+    val showTitle: String?,
+)
+
 @Dao
 interface VideoDao {
 
@@ -40,6 +49,21 @@ interface VideoDao {
     @Transaction
     @Query("SELECT * FROM videos WHERE id = :videoId LIMIT 1")
     fun getById(videoId: Long): Flow<VideoWithProgress?>
+
+    // Started but not finished, most recently watched first — the "pick up where you left off" list.
+    @Transaction
+    @Query(
+        """
+        SELECT videos.*, shows.canonicalTitle AS showTitle
+        FROM videos
+        INNER JOIN watch_progress ON watch_progress.videoId = videos.id
+        LEFT JOIN shows ON shows.id = videos.showId
+        WHERE watch_progress.isFinished = 0 AND watch_progress.positionMs > 0
+        ORDER BY watch_progress.lastWatchedAt DESC
+        LIMIT :limit
+        """,
+    )
+    fun getContinueWatching(limit: Int): Flow<List<VideoWithProgressAndShow>>
 
     @Query("UPDATE videos SET durationMs = :durationMs WHERE id = :videoId")
     suspend fun updateDuration(videoId: Long, durationMs: Long)
