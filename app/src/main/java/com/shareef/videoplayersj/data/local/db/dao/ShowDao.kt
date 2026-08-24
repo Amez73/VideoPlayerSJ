@@ -10,6 +10,9 @@ import kotlinx.coroutines.flow.Flow
 data class ShowWithEpisodeCount(
     @Embedded val show: ShowEntity,
     val episodeCount: Int,
+    /** Earliest episode, used as the show's thumbnail. Null if the show somehow has no episodes. */
+    val thumbnailVideoId: Long?,
+    val thumbnailUri: String?,
 )
 
 @Dao
@@ -23,7 +26,16 @@ interface ShowDao {
 
     @Query(
         """
-        SELECT shows.*, COUNT(videos.id) AS episodeCount
+        SELECT shows.*,
+            COUNT(videos.id) AS episodeCount,
+            (
+                SELECT v.id FROM videos v
+                WHERE v.showId = shows.id ORDER BY v.season, v.episode LIMIT 1
+            ) AS thumbnailVideoId,
+            (
+                SELECT v.documentUriString FROM videos v
+                WHERE v.showId = shows.id ORDER BY v.season, v.episode LIMIT 1
+            ) AS thumbnailUri
         FROM shows
         LEFT JOIN videos ON videos.showId = shows.id
         GROUP BY shows.id

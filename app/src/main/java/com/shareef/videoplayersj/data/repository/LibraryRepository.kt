@@ -43,7 +43,15 @@ class LibraryRepository(
 
     fun observeShows(): Flow<List<LibraryShow>> =
         showDao.getAllWithEpisodeCount().map { list ->
-            list.map { LibraryShow(id = it.show.id, canonicalTitle = it.show.canonicalTitle, episodeCount = it.episodeCount) }
+            list.map {
+                LibraryShow(
+                    id = it.show.id,
+                    canonicalTitle = it.show.canonicalTitle,
+                    episodeCount = it.episodeCount,
+                    thumbnailVideoId = it.thumbnailVideoId,
+                    thumbnailUri = it.thumbnailUri,
+                )
+            }
         }
 
     fun observeShowTitle(showId: Long): Flow<String?> =
