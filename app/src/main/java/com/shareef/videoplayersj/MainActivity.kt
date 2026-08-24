@@ -4,15 +4,17 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.shareef.videoplayersj.ui.navigation.NavGraph
 import com.shareef.videoplayersj.ui.theme.VideoPlayerSJTheme
 
-class MainActivity : ComponentActivity() {
+// AppCompatActivity (a FragmentActivity) rather than ComponentActivity: the Cast button's device
+// chooser is a DialogFragment and throws unless its host activity is a FragmentActivity.
+class MainActivity : AppCompatActivity() {
 
     private val requestNotificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* no-op either way */ }

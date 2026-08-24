@@ -1,3 +1,5 @@
 <resources>
-    <style name="Theme.VideoPlayerSJ" parent="android:Theme.Material.NoActionBar" />
+    <!-- Must stay an AppCompat descendant: the Cast button (MediaRouteButton) and its device
+         chooser dialog throw at runtime under a plain framework theme. -->
+    <style name="Theme.VideoPlayerSJ" parent="Theme.AppCompat.NoActionBar" />
 </resources>

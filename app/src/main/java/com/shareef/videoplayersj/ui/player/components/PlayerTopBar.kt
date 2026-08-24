@@ -1,5 +1,6 @@
 package com.shareef.videoplayersj.ui.player.components
 
+import android.view.View
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -39,10 +40,15 @@ fun PlayerTopBar(
         Text(title, color = Color.White, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (isCastAvailable) {
             AndroidView(
+                // Casting is optional, so it must never be able to take the player down with it:
+                // MediaRouteButton throws if the host theme/activity don't satisfy its AppCompat
+                // requirements, and losing the button beats losing playback.
                 factory = { ctx ->
-                    MediaRouteButton(ctx).apply {
-                        CastButtonFactory.setUpMediaRouteButton(ctx, this)
-                    }
+                    runCatching {
+                        MediaRouteButton(ctx).apply {
+                            CastButtonFactory.setUpMediaRouteButton(ctx, this)
+                        } as View
+                    }.getOrElse { View(ctx) }
                 },
             )
         }
