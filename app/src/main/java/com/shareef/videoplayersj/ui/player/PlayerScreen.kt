@@ -9,6 +9,7 @@ import android.content.IntentFilter
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.os.Build
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -203,6 +204,33 @@ fun PlayerScreen(
             activity?.window?.let { window ->
                 WindowCompat.getInsetsController(window, view)
                     .show(WindowInsetsCompat.Type.systemBars())
+            }
+        }
+    }
+
+    // Let the video draw into the camera cutout. Without this the system masks that strip off with
+    // a letterbox bar, which is part of the framebuffer and so gets mirrored to the TV as well.
+    DisposableEffect(activity) {
+        val window = activity?.window
+        val supportsCutoutMode = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+        val previousMode = if (window != null && supportsCutoutMode) {
+            window.attributes.layoutInDisplayCutoutMode
+        } else {
+            null
+        }
+
+        if (window != null && supportsCutoutMode) {
+            window.attributes = window.attributes.apply {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+        }
+
+        onDispose {
+            if (window != null && previousMode != null) {
+                window.attributes = window.attributes.apply {
+                    layoutInDisplayCutoutMode = previousMode
+                }
             }
         }
     }
