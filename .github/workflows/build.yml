@@ -42,11 +42,24 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
+      - name: Build metadata
+        id: meta
+        run: |
+          echo "sha_short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          echo "built_at=$(date -u '+%Y-%m-%d %H:%M UTC')" >> "$GITHUB_OUTPUT"
+
+      # The release is updated in place, so GitHub keeps showing the date the
+      # tag was first published. Put the real build time in the title/body so
+      # the release card shows how fresh the APK actually is.
       - name: Update latest release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
-          name: Latest build
-          body: Automatically built from commit ${{ github.sha }}
+          name: Latest build · ${{ steps.meta.outputs.sha_short }} · ${{ steps.meta.outputs.built_at }}
+          body: |
+            Built ${{ steps.meta.outputs.built_at }} from commit ${{ github.sha }}
+
+            Note: GitHub shows this release's original publish date, not the
+            APK's upload time. Trust the timestamp above.
           make_latest: true
           files: app/build/outputs/apk/debug/app-debug.apk
