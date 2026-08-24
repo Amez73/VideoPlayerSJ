@@ -39,6 +39,9 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -177,6 +180,31 @@ fun PlayerScreen(
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
         onDispose { runCatching { context.unregisterReceiver(receiver) } }
+    }
+
+    // Hide the status and navigation bars whenever the HUD is hidden, so tapping the video once
+    // leaves nothing but picture — which also matters when screen mirroring to a TV, since
+    // Miracast sends the phone's clock, battery and nav buttons along with everything else.
+    LaunchedEffect(activity, view, controlsVisible, isInPipMode) {
+        val window = activity?.window ?: return@LaunchedEffect
+        val insetsController = WindowCompat.getInsetsController(window, view)
+        insetsController.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        if (controlsVisible && !isInPipMode) {
+            insetsController.show(WindowInsetsCompat.Type.systemBars())
+        } else {
+            insetsController.hide(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+
+    // Restore the bars once on the way out, rather than on every HUD toggle above.
+    DisposableEffect(Unit) {
+        onDispose {
+            activity?.window?.let { window ->
+                WindowCompat.getInsetsController(window, view)
+                    .show(WindowInsetsCompat.Type.systemBars())
+            }
+        }
     }
 
     // Transient "-10s"/"+10s" flash after a double-tap. The tick forces the hide timer to restart
