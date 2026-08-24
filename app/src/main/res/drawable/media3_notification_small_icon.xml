@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This name/type overrides media3-session's own drawable of the same name (its default is a
+     generic circular play icon) — DefaultMediaNotificationProvider looks up this exact resource,
+     there's no Builder setter for it. Keep it a flat alpha-mask silhouette: status bar icons render
+     only the alpha channel, so this is a dedicated 24dp glyph rather than a reuse of the (108dp,
+     adaptive-icon-padded) ic_launcher_foreground. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFF">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M8,5 L19,12 L8,19 Z" />
+</vector>
