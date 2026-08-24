@@ -6,14 +6,19 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.clickable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -71,7 +76,17 @@ fun PlayerScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+    var controlsVisible by remember { mutableStateOf(true) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+            ) { controlsVisible = !controlsVisible },
+    ) {
         AndroidView(
             factory = { PlayerView(it).apply { useController = false } },
             update = { it.player = player },
@@ -79,24 +94,27 @@ fun PlayerScreen(
             modifier = Modifier.fillMaxSize(),
         )
 
-        PlayerTopBar(
-            title = uiState.title,
-            onBack = onBack,
-            modifier = Modifier.align(Alignment.TopCenter),
-        )
+        if (controlsVisible) {
+            PlayerTopBar(
+                title = uiState.title,
+                onBack = onBack,
+                isCastAvailable = viewModel.isCastAvailable,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
 
-        Column(modifier = Modifier.align(Alignment.BottomCenter)) {
-            SeekBar(
-                positionMs = uiState.positionMs,
-                durationMs = uiState.durationMs,
-                onSeek = { viewModel.seekTo(it) },
-            )
-            PlayerControls(
-                isPlaying = uiState.isPlaying,
-                onPlayPause = { viewModel.togglePlayPause() },
-                onSkipBack = { viewModel.skipBack() },
-            )
-            VolumeControl(onVolumeChange = { viewModel.setVolume(it) })
+            Column(modifier = Modifier.align(Alignment.BottomCenter)) {
+                SeekBar(
+                    positionMs = uiState.positionMs,
+                    durationMs = uiState.durationMs,
+                    onSeek = { viewModel.seekTo(it) },
+                )
+                PlayerControls(
+                    isPlaying = uiState.isPlaying,
+                    onPlayPause = { viewModel.togglePlayPause() },
+                    onSkipBack = { viewModel.skipBack() },
+                )
+                VolumeControl(onVolumeChange = { viewModel.setVolume(it) })
+            }
         }
     }
 }

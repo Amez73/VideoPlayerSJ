@@ -34,6 +34,8 @@ class PlayerViewModel(
 
     val player: StateFlow<Player?> = playbackConnection.player
 
+    val isCastAvailable: Boolean = playbackConnection.isCastAvailable
+
     val uiState: StateFlow<PlayerUiState> = combine(
         libraryRepository.observeVideo(videoId),
         playbackConnection.nowPlaying,

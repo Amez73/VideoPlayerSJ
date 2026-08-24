@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
@@ -13,10 +14,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.mediarouter.app.MediaRouteButton
+import com.google.android.gms.cast.framework.CastButtonFactory
 
 @Composable
-fun PlayerTopBar(title: String, onBack: () -> Unit, modifier: Modifier = Modifier) {
+fun PlayerTopBar(
+    title: String,
+    onBack: () -> Unit,
+    isCastAvailable: Boolean,
+    modifier: Modifier = Modifier,
+) {
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -27,6 +37,15 @@ fun PlayerTopBar(title: String, onBack: () -> Unit, modifier: Modifier = Modifie
         IconButton(onClick = onBack) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
         }
-        Text(title, color = Color.White)
+        Text(title, color = Color.White, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (isCastAvailable) {
+            AndroidView(
+                factory = { ctx ->
+                    MediaRouteButton(ctx).apply {
+                        CastButtonFactory.setUpMediaRouteButton(ctx, this)
+                    }
+                },
+            )
+        }
     }
 }
