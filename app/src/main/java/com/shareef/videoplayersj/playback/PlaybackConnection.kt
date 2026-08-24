@@ -1,0 +1,282 @@
+package com.shareef.videoplayersj.playback
+
+import android.content.ComponentName
+import android.content.Context
+import android.net.Uri
+import androidx.core.content.ContextCompat
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.Player
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
+import com.google.common.util.concurrent.ListenableFuture
+import com.shareef.videoplayersj.data.repository.WatchProgressRepository
+import com.shareef.videoplayersj.model.LibraryVideo
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+
+data class NowPlaying(
+    val videoId: Long,
+    val title: String,
+    val subtitle: String?,
+    val isPlaying: Boolean,
+    val positionMs: Long,
+    val durationMs: Long,
+)
+
+private const val RESUME_MIN_MS = 5_000L
+private const val RESUME_MAX_FRACTION = 0.95
+private const val PROGRESS_SAVE_INTERVAL_MS = 5_000L
+private const val SKIP_BACK_MS = 10_000L
+
+/**
+ * The single, app-scoped connection to [PlaybackService]'s [MediaController] — owns the one
+ * playback session for the whole app so the mini-player, the full player screen, the system
+ * notification, and the lock screen are all reading/driving the same state and can never disagree.
+ * Connects lazily on first [playVideo] so browsing the library never spins up the service.
+ */
+class PlaybackConnection(
+    context: Context,
+    private val watchProgressRepository: WatchProgressRepository,
+) {
+    private val appContext = context.applicationContext
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    private var controllerFuture: ListenableFuture<MediaController>? = null
+    private var controller: MediaController? = null
+    private var pendingConnect: CompletableDeferred<MediaController>? = null
+    private var tickerJob: Job? = null
+    private var hasPrepared = false
+    private var lastSavedAt = 0L
+
+    private val _player = MutableStateFlow<Player?>(null)
+    val player: StateFlow<Player?> = _player.asStateFlow()
+
+    private val _nowPlaying = MutableStateFlow<NowPlaying?>(null)
+    val nowPlaying: StateFlow<NowPlaying?> = _nowPlaying.asStateFlow()
+
+    private val sessionListener = object : Player.Listener {
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            refreshNowPlaying()
+            if (!isPlaying) saveProgress(isFinished = false)
+        }
+
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            when (playbackState) {
+                Player.STATE_READY, Player.STATE_BUFFERING -> {
+                    hasPrepared = true
+                    refreshNowPlaying()
+                }
+                Player.STATE_ENDED -> {
+                    saveProgress(isFinished = true)
+                    teardown()
+                }
+                Player.STATE_IDLE -> {
+                    // Only treat this as "stopped externally" (e.g. notification swipe-away sends
+                    // COMMAND_STOP) once we know playback had actually started — STATE_IDLE is also
+                    // the state a MediaItem sits in before prepare() is called.
+                    if (hasPrepared) {
+                        saveProgress(isFinished = false)
+                        teardown()
+                    }
+                }
+            }
+        }
+
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            refreshNowPlaying()
+        }
+    }
+
+    suspend fun playVideo(video: LibraryVideo) {
+        val c = awaitController()
+
+        if (c.currentMediaItem?.mediaId == video.id.toString()) {
+            // Already the loaded/playing item — e.g. reopening the player screen, or tapping the
+            // mini-player. Don't restart it.
+            return
+        }
+
+        val outgoingVideoId = c.currentMediaItem?.mediaId?.toLongOrNull()
+        if (outgoingVideoId != null) {
+            val position = c.currentPosition.coerceAtLeast(0L)
+            val duration = c.duration.coerceAtLeast(0L)
+            if (duration > 0L) {
+                scope.launch { watchProgressRepository.saveProgress(outgoingVideoId, position, duration, false) }
+            }
+        }
+
+        val startPositionMs = resumePositionFor(video.id)
+        val mediaItem = MediaItem.Builder()
+            .setMediaId(video.id.toString())
+            .setUri(Uri.parse(video.documentUriString))
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle(video.displayTitle)
+                    .setArtist(buildSubtitle(video))
+                    .setIsBrowsable(false)
+                    .setIsPlayable(true)
+                    .build(),
+            )
+            .build()
+
+        hasPrepared = false
+        c.setMediaItem(mediaItem, startPositionMs)
+        c.prepare()
+        c.play()
+        refreshNowPlaying()
+    }
+
+    fun togglePlayPause() {
+        controller?.let { if (it.isPlaying) it.pause() else it.play() }
+    }
+
+    fun skipBack() {
+        controller?.let { it.seekTo((it.currentPosition - SKIP_BACK_MS).coerceAtLeast(0L)) }
+        // Reflect the new position immediately rather than waiting for the next 500ms tick.
+        refreshNowPlaying()
+    }
+
+    fun seekTo(positionMs: Long) {
+        controller?.let { it.seekTo(positionMs.coerceIn(0L, it.duration.coerceAtLeast(0L))) }
+        refreshNowPlaying()
+    }
+
+    fun setVolume(volume: Float) {
+        controller?.volume = volume.coerceIn(0f, 1f)
+    }
+
+    fun stopAndDismiss() {
+        saveProgress(isFinished = false)
+        teardown()
+    }
+
+    private suspend fun awaitController(): MediaController {
+        controller?.let { return it }
+        pendingConnect?.let { return it.await() }
+
+        val deferred = CompletableDeferred<MediaController>()
+        pendingConnect = deferred
+
+        val token = SessionToken(appContext, ComponentName(appContext, PlaybackService::class.java))
+        val future = MediaController.Builder(appContext, token).buildAsync()
+        controllerFuture = future
+        future.addListener(
+            {
+                try {
+                    val connected = future.get()
+                    onConnected(connected)
+                    deferred.complete(connected)
+                } catch (error: Exception) {
+                    pendingConnect = null
+                    deferred.completeExceptionally(error)
+                }
+            },
+            ContextCompat.getMainExecutor(appContext),
+        )
+        return deferred.await()
+    }
+
+    private fun onConnected(mediaController: MediaController) {
+        controller = mediaController
+        pendingConnect = null
+        mediaController.addListener(sessionListener)
+        _player.value = mediaController
+        refreshNowPlaying()
+        startTicker()
+    }
+
+    private fun startTicker() {
+        tickerJob?.cancel()
+        tickerJob = scope.launch {
+            while (isActive) {
+                val c = controller
+                if (c != null && c.isPlaying) {
+                    refreshNowPlaying()
+                    maybeSaveProgress()
+                }
+                delay(500)
+            }
+        }
+    }
+
+    private fun refreshNowPlaying() {
+        val c = controller
+        val item = c?.currentMediaItem
+        val videoId = item?.mediaId?.toLongOrNull()
+        if (c == null || item == null || videoId == null) {
+            _nowPlaying.value = null
+            return
+        }
+        _nowPlaying.value = NowPlaying(
+            videoId = videoId,
+            title = item.mediaMetadata.title?.toString().orEmpty(),
+            subtitle = item.mediaMetadata.artist?.toString(),
+            isPlaying = c.isPlaying,
+            positionMs = c.currentPosition.coerceAtLeast(0L),
+            durationMs = c.duration.coerceAtLeast(0L),
+        )
+    }
+
+    private fun maybeSaveProgress() {
+        val now = System.currentTimeMillis()
+        if (now - lastSavedAt >= PROGRESS_SAVE_INTERVAL_MS) {
+            lastSavedAt = now
+            saveProgress(isFinished = false)
+        }
+    }
+
+    private fun saveProgress(isFinished: Boolean) {
+        val c = controller ?: return
+        val videoId = c.currentMediaItem?.mediaId?.toLongOrNull() ?: return
+        val position = c.currentPosition.coerceAtLeast(0L)
+        val duration = c.duration.coerceAtLeast(0L)
+        if (duration <= 0L) return
+        scope.launch { watchProgressRepository.saveProgress(videoId, position, duration, isFinished) }
+    }
+
+    private suspend fun resumePositionFor(videoId: Long): Long {
+        val progress = watchProgressRepository.getProgress(videoId) ?: return 0L
+        if (progress.isFinished || progress.durationMs <= 0L) return 0L
+        val resumeCeiling = (progress.durationMs * RESUME_MAX_FRACTION).toLong()
+        return if (progress.positionMs in RESUME_MIN_MS until resumeCeiling) progress.positionMs else 0L
+    }
+
+    private fun buildSubtitle(video: LibraryVideo): String? {
+        val seasonEpisode = if (video.season != null && video.episode != null) {
+            "S%02dE%02d".format(video.season, video.episode)
+        } else {
+            video.episode?.let { "Episode $it" }
+        }
+        return when {
+            seasonEpisode != null && !video.episodeTitle.isNullOrBlank() -> "$seasonEpisode · ${video.episodeTitle}"
+            seasonEpisode != null -> seasonEpisode
+            !video.episodeTitle.isNullOrBlank() -> video.episodeTitle
+            else -> null
+        }
+    }
+
+    private fun teardown() {
+        controller?.pause()
+        controller?.clearMediaItems()
+        controller?.removeListener(sessionListener)
+        controllerFuture?.let { MediaController.releaseFuture(it) }
+        tickerJob?.cancel()
+        tickerJob = null
+        controller = null
+        controllerFuture = null
+        pendingConnect = null
+        hasPrepared = false
+        _player.value = null
+        _nowPlaying.value = null
+    }
+}
