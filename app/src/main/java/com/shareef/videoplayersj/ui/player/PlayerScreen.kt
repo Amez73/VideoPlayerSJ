@@ -1,6 +1,10 @@
 package com.shareef.videoplayersj.ui.player
 
 import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -18,6 +22,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,6 +82,22 @@ fun PlayerScreen(
     }
 
     var controlsVisible by remember { mutableStateOf(true) }
+    var isFullscreen by rememberSaveable { mutableStateOf(false) }
+
+    // Drive the activity's orientation directly, so the button behaves exactly like physically
+    // turning the phone. Sensor landscape (rather than a fixed one) keeps both landscape
+    // directions available and ignores the system rotation lock, which is what a fullscreen
+    // button is expected to do.
+    val activity = remember(context) { context.findActivity() }
+    DisposableEffect(activity, isFullscreen) {
+        activity?.requestedOrientation = if (isFullscreen) {
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+        // Never leave the rest of the app pinned to landscape after leaving the player.
+        onDispose { activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
+    }
 
     Box(
         modifier = Modifier
@@ -110,11 +131,20 @@ fun PlayerScreen(
                 )
                 PlayerControls(
                     isPlaying = uiState.isPlaying,
+                    isFullscreen = isFullscreen,
                     onPlayPause = { viewModel.togglePlayPause() },
                     onSkipBack = { viewModel.skipBack() },
+                    onToggleFullscreen = { isFullscreen = !isFullscreen },
                 )
                 VolumeControl(onVolumeChange = { viewModel.setVolume(it) })
             }
         }
     }
+}
+
+/** Compose hands out a themed wrapper rather than the Activity itself, so unwrap to reach it. */
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
