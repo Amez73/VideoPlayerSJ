@@ -10,7 +10,6 @@ import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.ComponentActivity
-import androidx.activity.PictureInPictureModeChangedInfo
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -40,7 +39,6 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import androidx.core.util.Consumer
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -52,6 +50,7 @@ import com.shareef.videoplayersj.ui.player.components.PlayerTopBar
 import com.shareef.videoplayersj.ui.player.components.SeekBar
 import com.shareef.videoplayersj.ui.player.components.VolumeControl
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 
 @Composable
 fun PlayerScreen(
@@ -115,15 +114,10 @@ fun PlayerScreen(
 
     // --- Picture-in-picture -------------------------------------------------------------
     val pipSupported = remember(context) { isPipSupported(context) }
-    var isInPipMode by remember { mutableStateOf(activity?.isInPictureInPictureMode == true) }
-
-    DisposableEffect(activity) {
-        val listener = Consumer<PictureInPictureModeChangedInfo> { info ->
-            isInPipMode = info.isInPictureInPictureMode
-        }
-        activity?.addOnPictureInPictureModeChangedListener(listener)
-        onDispose { activity?.removeOnPictureInPictureModeChangedListener(listener) }
+    val pipModeFlow = remember(activity) {
+        (activity as? MainActivity)?.isInPipMode ?: MutableStateFlow(false)
     }
+    val isInPipMode by pipModeFlow.collectAsState()
 
     val enterPip: () -> Unit = {
         if (pipSupported && activity != null) {

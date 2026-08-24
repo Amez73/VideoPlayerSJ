@@ -2,6 +2,7 @@ package com.shareef.videoplayersj
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.compose.setContent
@@ -11,6 +12,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.shareef.videoplayersj.ui.navigation.NavGraph
 import com.shareef.videoplayersj.ui.theme.VideoPlayerSJTheme
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 // AppCompatActivity (a FragmentActivity) rather than ComponentActivity: the Cast button's device
 // chooser is a DialogFragment and throws unless its host activity is a FragmentActivity.
@@ -23,9 +27,19 @@ class MainActivity : AppCompatActivity() {
      * Only needed below Android 12, which can auto-enter from PictureInPictureParams instead. */
     var onUserLeaveHintCallback: (() -> Unit)? = null
 
+    private val _isInPipMode = MutableStateFlow(false)
+    /** Whether the activity is currently a picture-in-picture window, so the player can strip its
+     * UI down to just the video. */
+    val isInPipMode: StateFlow<Boolean> = _isInPipMode.asStateFlow()
+
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         onUserLeaveHintCallback?.invoke()
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        _isInPipMode.value = isInPictureInPictureMode
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
