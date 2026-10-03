@@ -91,5 +91,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp desktop/build/compose/binaries/main/msi/*.msi VideoPlayerSJ-windows.msi
-          gh release upload latest VideoPlayerSJ-windows.msi VideoPlayerSJ-windows-portable.zip --clobber
+          cp desktop/build/compose/binaries/main/msi/*.msi VideoPlayerSJ-Windows-Installer.msi
+          gh release upload latest VideoPlayerSJ-Windows-Installer.msi VideoPlayerSJ-windows-portable.zip --clobber

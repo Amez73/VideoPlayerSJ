@@ -94,8 +94,24 @@ compose.desktop {
     }
 }
 
+// Puts a copy of the installer at the top of the repo under an obvious name, rather than leaving
+// it buried in build/compose/binaries/main/msi. Done by hand rather than with a Copy task, which
+// would treat the whole repo root as its output directory.
+val installerName = "VideoPlayerSJ-Windows-Installer.msi"
+val copyInstallerToRoot by tasks.registering {
+    val msiDir = layout.buildDirectory.dir("compose/binaries/main/msi")
+    val target = rootProject.layout.projectDirectory.file(installerName)
+    doLast {
+        val msi = msiDir.get().asFile.listFiles { file -> file.extension == "msi" }?.maxByOrNull { it.lastModified() }
+            ?: throw GradleException("No MSI found in ${msiDir.get().asFile}")
+        msi.copyTo(target.asFile, overwrite = true)
+        logger.lifecycle("Installer: ${target.asFile}")
+    }
+}
+
 if (isWindowsHost) {
     tasks.matching { it.name == "prepareAppResources" }.configureEach { dependsOn(extractVlc) }
+    tasks.matching { it.name == "packageMsi" }.configureEach { finalizedBy(copyInstallerToRoot) }
 }
 
 tasks.test {
