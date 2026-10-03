@@ -76,7 +76,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Dmg, TargetFormat.Deb)
             packageName = "VideoPlayerSJ"
-            packageVersion = "1.0.0"
+            packageVersion = "1.1.0"
             description = "Plays a folder of downloaded shows and movies"
             vendor = "Shareef"
             modules("java.instrument", "jdk.unsupported")

@@ -20,78 +20,145 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.VerticalScrollbar
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Tv
 import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.TooltipArea
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.shareef.videoplayersj.desktop.data.LibraryRepository
 import com.shareef.videoplayersj.desktop.model.LibraryVideo
 import com.shareef.videoplayersj.desktop.ui.common.MediaCard
+import com.shareef.videoplayersj.desktop.ui.common.arrowKeyFocus
+import com.shareef.videoplayersj.desktop.ui.common.focusRing
 import com.shareef.videoplayersj.desktop.ui.common.chooseFolder
 import com.shareef.videoplayersj.desktop.ui.common.openInBrowser
 import com.shareef.videoplayersj.desktop.ui.common.revealInFileManager
 import com.shareef.videoplayersj.util.formatDuration
 import kotlinx.coroutines.launch
 
+/**
+ * Library screen state that outlives the screen itself, so coming back from a show or the player
+ * returns to the same scroll position with the same card selected.
+ */
+class LibraryUiState {
+    val gridState = LazyGridState()
+    var query by mutableStateOf("")
+    var focusedKey: String? = null
+    private val focusRequesters = mutableMapOf<String, FocusRequester>()
+
+    fun focusRequester(key: String): FocusRequester = focusRequesters.getOrPut(key) { FocusRequester() }
+
+    /** Focuses the last selected card if it's still on screen, else the first visible one. */
+    fun restoreFocus() {
+        val visibleCards = gridState.layoutInfo.visibleItemsInfo.map { it.key }.filterIsInstance<String>()
+            .filter { !it.startsWith(HEADER_KEY_PREFIX) }
+        val candidates = listOfNotNull(focusedKey?.takeIf { it in visibleCards }) + visibleCards
+        for (key in candidates) {
+            if (runCatching { focusRequester(key).requestFocus() }.isSuccess) return
+        }
+    }
+}
+
+private const val HEADER_KEY_PREFIX = "header-"
+
 @Composable
 fun LibraryScreen(
     repository: LibraryRepository,
+    uiState: LibraryUiState,
     isVlcAvailable: Boolean,
+    isFullscreen: Boolean,
+    isCouchMode: Boolean,
+    onToggleCouchMode: () -> Unit,
+    onQuit: () -> Unit,
     onShowClick: (Long) -> Unit,
     onVideoClick: (LibraryVideo) -> Unit,
 ) {
     val view by repository.view.collectAsState()
     val isScanning by repository.isScanning.collectAsState()
     val scope = rememberCoroutineScope()
-    var query by rememberSaveable { mutableStateOf("") }
     var showFolders by remember { mutableStateOf(false) }
 
     val addFolder: () -> Unit = {
         chooseFolder()?.let { dir -> scope.launch { repository.addFolder(dir) } }
     }
 
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .arrowKeyFocus()
+            .onKeyEvent { event ->
+                // Escape (B on a controller) backs out of a search into the results.
+                if (event.type != KeyEventType.KeyDown || event.key != Key.Escape || uiState.query.isEmpty()) {
+                    return@onKeyEvent false
+                }
+                uiState.query = ""
+                uiState.restoreFocus()
+                true
+            },
+    ) {
         LibraryTopBar(
-            query = query,
-            onQueryChange = { query = it },
+            query = uiState.query,
+            onQueryChange = { uiState.query = it },
             isScanning = isScanning,
+            isFullscreen = isFullscreen,
+            isCouchMode = isCouchMode,
             onRefresh = { scope.launch { repository.rescanAll() } },
             onManageFolders = { showFolders = true },
             onAddFolder = addFolder,
+            onToggleCouchMode = onToggleCouchMode,
+            onQuit = onQuit,
         )
 
         if (!isVlcAvailable) VlcMissingBanner()
@@ -105,7 +172,7 @@ fun LibraryScreen(
                 }
             } else {
                 LibraryGrid(
-                    query = query,
+                    uiState = uiState,
                     repository = repository,
                     onShowClick = onShowClick,
                     onVideoClick = onVideoClick,
@@ -121,14 +188,25 @@ fun LibraryScreen(
 
 @Composable
 private fun LibraryGrid(
-    query: String,
+    uiState: LibraryUiState,
     repository: LibraryRepository,
     onShowClick: (Long) -> Unit,
     onVideoClick: (LibraryVideo) -> Unit,
 ) {
     val view by repository.view.collectAsState()
     val scope = rememberCoroutineScope()
-    val gridState = rememberLazyGridState()
+    val gridState = uiState.gridState
+    val query = uiState.query
+
+    // Puts a card under keyboard/controller focus as soon as the grid has laid out.
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        uiState.restoreFocus()
+    }
+
+    fun Modifier.trackFocus(key: String) = this
+        .focusRequester(uiState.focusRequester(key))
+        .onFocusChanged { if (it.isFocused) uiState.focusedKey = key }
 
     val needle = query.trim().lowercase()
     fun matches(text: String?) = needle.isEmpty() || text?.lowercase()?.contains(needle) == true
@@ -165,6 +243,7 @@ private fun LibraryGrid(
                         thumbnailPath = video.path,
                         progress = video.progressFraction,
                         onClick = { onVideoClick(video) },
+                        modifier = Modifier.trackFocus("continue-${video.id}"),
                         contextMenu = { videoMenu(video) },
                     )
                 }
@@ -184,6 +263,7 @@ private fun LibraryGrid(
                         badge = show.episodeCount.toString(),
                         isWatched = show.watchedCount == show.episodeCount,
                         onClick = { onShowClick(show.id) },
+                        modifier = Modifier.trackFocus("show-${show.id}"),
                     )
                 }
             }
@@ -198,6 +278,7 @@ private fun LibraryGrid(
                         progress = video.progressFraction.takeIf { !video.isFinished },
                         isWatched = video.isFinished,
                         onClick = { onVideoClick(video) },
+                        modifier = Modifier.trackFocus("movie-${video.id}"),
                         contextMenu = { videoMenu(video) },
                     )
                 }
@@ -227,7 +308,7 @@ private fun remainingLabel(video: LibraryVideo): String? {
 }
 
 private fun LazyGridScope.sectionHeader(title: String, count: Int? = null) {
-    item(span = { GridItemSpan(maxLineSpan) }, key = "header-$title", contentType = "header") {
+    item(span = { GridItemSpan(maxLineSpan) }, key = "$HEADER_KEY_PREFIX$title", contentType = "header") {
         Row(
             verticalAlignment = Alignment.Bottom,
             modifier = Modifier.padding(top = 28.dp),
@@ -250,9 +331,13 @@ private fun LibraryTopBar(
     query: String,
     onQueryChange: (String) -> Unit,
     isScanning: Boolean,
+    isFullscreen: Boolean,
+    isCouchMode: Boolean,
     onRefresh: () -> Unit,
     onManageFolders: () -> Unit,
     onAddFolder: () -> Unit,
+    onToggleCouchMode: () -> Unit,
+    onQuit: () -> Unit,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -283,20 +368,36 @@ private fun LibraryTopBar(
         TooltipIconButton("Manage folders", onClick = onManageFolders) {
             Icon(Icons.Outlined.Folder, contentDescription = "Manage folders")
         }
+        val couchTooltip = if (isCouchMode) "Couch mode on: always fullscreen" else "Couch mode: always fullscreen"
+        TooltipIconButton(couchTooltip, onClick = onToggleCouchMode) {
+            Icon(
+                if (isCouchMode) Icons.Filled.Tv else Icons.Outlined.Tv,
+                contentDescription = couchTooltip,
+                tint = if (isCouchMode) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+            )
+        }
         Spacer(Modifier.width(8.dp))
-        FilledTonalButton(onClick = onAddFolder) {
+        FilledTonalButton(onClick = onAddFolder, modifier = Modifier.focusRing(ButtonDefaults.filledTonalShape)) {
             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Text("Add folder", modifier = Modifier.padding(start = 6.dp))
+        }
+        // Fullscreen hides the window's close button.
+        if (isFullscreen) {
+            Spacer(Modifier.width(8.dp))
+            TooltipIconButton("Quit", onClick = onQuit) {
+                Icon(Icons.Default.PowerSettingsNew, contentDescription = "Quit")
+            }
         }
     }
 }
 
 @Composable
 private fun SearchField(query: String, onQueryChange: (String) -> Unit, modifier: Modifier = Modifier) {
+    val focusManager = LocalFocusManager.current
     Surface(
         shape = RoundedCornerShape(50),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = modifier.height(40.dp),
+        modifier = modifier.height(40.dp).focusRing(RoundedCornerShape(50)),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 14.dp, end = 4.dp)) {
             Icon(
@@ -315,7 +416,18 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit, modifier
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().onPreviewKeyEvent { event ->
+                        // Up/Down, and Left/Right while empty, leave the field rather than move the caret.
+                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        val direction = when (event.key) {
+                            Key.DirectionUp -> FocusDirection.Up
+                            Key.DirectionDown -> FocusDirection.Down
+                            Key.DirectionLeft -> FocusDirection.Left.takeIf { query.isEmpty() }
+                            Key.DirectionRight -> FocusDirection.Right.takeIf { query.isEmpty() }
+                            else -> null
+                        } ?: return@onPreviewKeyEvent false
+                        focusManager.moveFocus(direction)
+                    },
                 )
             }
             if (query.isNotEmpty()) {
@@ -352,7 +464,7 @@ fun TooltipIconButton(
         },
         delayMillis = 500,
     ) {
-        IconButton(onClick = onClick, enabled = enabled) { content() }
+        IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.focusRing(CircleShape)) { content() }
     }
 }
 
@@ -377,7 +489,9 @@ private fun EmptyLibraryState(onAddFolder: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(4.dp))
-        Button(onClick = onAddFolder) {
+        val addButton = remember { FocusRequester() }
+        LaunchedEffect(Unit) { runCatching { addButton.requestFocus() } }
+        Button(onClick = onAddFolder, modifier = Modifier.focusRequester(addButton).focusRing(ButtonDefaults.shape)) {
             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Text("Add folder", modifier = Modifier.padding(start = 6.dp))
         }

@@ -2,6 +2,8 @@ package com.shareef.videoplayersj.desktop
 
 import com.shareef.videoplayersj.desktop.data.LibraryRepository
 import com.shareef.videoplayersj.desktop.data.LibraryStore
+import com.shareef.videoplayersj.desktop.data.SettingsStore
+import com.shareef.videoplayersj.desktop.input.Gamepad
 import com.shareef.videoplayersj.desktop.playback.PlayerController
 import com.shareef.videoplayersj.desktop.playback.VlcSetup
 import com.shareef.videoplayersj.desktop.thumbnails.ThumbnailLoader
@@ -16,6 +18,10 @@ class AppContainer {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Swing)
 
     val libraryRepository = LibraryRepository(LibraryStore(), scope)
+
+    val settingsStore = SettingsStore()
+
+    val gamepad = Gamepad(scope)
 
     /** Null when libVLC couldn't be found; the UI then explains how to fix it. */
     val playerController: PlayerController? =
