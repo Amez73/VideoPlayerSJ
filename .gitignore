@@ -14,3 +14,4 @@ local.properties
 /.kotlin
 /core/build
 /desktop/build
+/VideoPlayerSJ-Windows-Installer.msi
