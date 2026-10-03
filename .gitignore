@@ -12,3 +12,5 @@
 local.properties
 /.claude
 /.kotlin
+/core/build
+/desktop/build

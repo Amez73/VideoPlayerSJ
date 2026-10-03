@@ -16,3 +16,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "VideoPlayerSJ"
 include(":app")
+include(":core")
+include(":desktop")
