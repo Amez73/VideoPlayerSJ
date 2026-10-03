@@ -21,6 +21,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.swing)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.vlcj)
+    implementation(libs.jamepad)
 
     testImplementation(kotlin("test"))
 }
@@ -76,7 +77,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Dmg, TargetFormat.Deb)
             packageName = "VideoPlayerSJ"
-            packageVersion = "1.1.0"
+            packageVersion = "1.1.1"
             description = "Plays a folder of downloaded shows and movies"
             vendor = "Shareef"
             modules("java.instrument", "jdk.unsupported")
