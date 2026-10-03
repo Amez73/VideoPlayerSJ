@@ -38,6 +38,37 @@ Player keyboard shortcuts:
 | F / Enter / double-click | Fullscreen |
 | N | Next episode |
 | Esc | Exit fullscreen, then back to the library |
+| F11 | Fullscreen (anywhere in the app) |
+
+### Controller and couch mode
+
+The whole app can be used without a mouse. In the library and show pages the arrow keys move
+between items, Enter opens or plays, Esc goes back, and the Menu key (or Shift+F10) opens a
+video's options.
+
+Xbox-style controllers work out of the box on Windows (on macOS/Linux, map the controller to
+keys with Steam Input or similar):
+
+| Button | Library / show page | Player |
+| --- | --- | --- |
+| D-pad / left stick | Move | ← → skip 10 seconds, ↑ ↓ volume |
+| A | Open / play | Play / pause (plays the next episode once one finishes) |
+| B | Back, close menu | Back to the library |
+| Y | Options (mark watched, show in folder) | Next episode |
+| X | | Cycle subtitles |
+| LT / RT | | Back / forward 10 seconds |
+| LB / RB | | Volume down / up |
+| View (Back) | | Mute |
+| Start | Fullscreen | Fullscreen |
+
+**Couch mode** (the TV button in the library) keeps the whole app fullscreen and remembers it for
+next time; a Quit button appears in the top bar while fullscreen.
+
+To launch it from **Steam Big Picture**: in Steam, *Games → Add a Non-Steam Game to My Library*,
+browse to `VideoPlayerSJ.exe` (installed to `%LOCALAPPDATA%\VideoPlayerSJ` by default), and
+optionally put `--couch` in the shortcut's launch options to start in couch mode. Steam's default
+"Gamepad" controller layout passes the controller straight through, so PlayStation and Switch
+controllers work too.
 
 Run from source with `./gradlew :desktop:run`. On Windows the build downloads libVLC itself; on
 macOS/Linux install VLC first. The library is stored in `%APPDATA%\VideoPlayerSJ` (Windows),

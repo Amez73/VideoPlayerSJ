@@ -23,4 +23,6 @@ object AppDirs {
     val thumbnailDir: File by lazy { File(dataDir, "video-thumbs").apply { mkdirs() } }
 
     val libraryFile: File get() = File(dataDir, "library.json")
+
+    val settingsFile: File get() = File(dataDir, "settings.json")
 }

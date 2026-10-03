@@ -8,6 +8,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,23 +29,30 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.shareef.videoplayersj.desktop.input.InputMode
 
 val CardShape = RoundedCornerShape(10.dp)
 
 /**
  * A 16:9 thumbnail card with title and subtitle beneath, which lifts slightly and shows a play
- * button on hover. Right-click opens [contextMenu], if any.
+ * button on hover or keyboard/controller focus. Right-click, or the Menu key while focused, opens
+ * [contextMenu], if any.
  */
 @Composable
 fun MediaCard(
@@ -61,12 +69,22 @@ fun MediaCard(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
-    val scale by animateFloatAsState(if (hovered) 1.03f else 1f)
-    val overlayAlpha by animateFloatAsState(if (hovered) 1f else 0f)
+    val focused by interactionSource.collectIsFocusedAsState()
+    val highlighted = hovered || (focused && !InputMode.isPointer)
+    val scale by animateFloatAsState(if (highlighted) 1.03f else 1f)
+    val overlayAlpha by animateFloatAsState(if (highlighted) 1f else 0f)
+    var optionsOpen by remember { mutableStateOf(false) }
+    val selfFocus = remember { FocusRequester() }
 
     ContextMenuArea(items = contextMenu) {
         Column(
             modifier = modifier
+                .onPreviewKeyEvent { event ->
+                    if (!event.isOptionsKey() || contextMenu().isEmpty()) return@onPreviewKeyEvent false
+                    optionsOpen = true
+                    true
+                }
+                .focusRequester(selfFocus)
                 .hoverable(interactionSource)
                 .pointerHoverIcon(PointerIcon.Hand)
                 .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
@@ -81,7 +99,7 @@ fun MediaCard(
                     }
                     .clip(CardShape)
                     .then(
-                        if (hovered) {
+                        if (highlighted) {
                             Modifier.border(2.dp, MaterialTheme.colorScheme.primary, CardShape)
                         } else {
                             Modifier
@@ -142,6 +160,8 @@ fun MediaCard(
                 if (progress != null) {
                     ThumbnailProgressBar(progress, Modifier.align(Alignment.BottomCenter))
                 }
+
+                if (optionsOpen) OptionsDropdown(expanded = true, items = contextMenu(), onDismiss = { optionsOpen = false }, returnFocusTo = selfFocus)
             }
 
             Text(

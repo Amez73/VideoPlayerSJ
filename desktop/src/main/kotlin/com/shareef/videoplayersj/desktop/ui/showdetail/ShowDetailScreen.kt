@@ -4,9 +4,11 @@ import androidx.compose.foundation.ContextMenuArea
 import androidx.compose.foundation.ContextMenuItem
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,18 +28,22 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,14 +53,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.shareef.videoplayersj.desktop.data.LibraryRepository
+import com.shareef.videoplayersj.desktop.input.InputMode
 import com.shareef.videoplayersj.desktop.model.LibraryVideo
 import com.shareef.videoplayersj.desktop.ui.common.CardShape
+import com.shareef.videoplayersj.desktop.ui.common.OptionsDropdown
+import com.shareef.videoplayersj.desktop.ui.common.arrowKeyFocus
+import com.shareef.videoplayersj.desktop.ui.common.focusRing
+import com.shareef.videoplayersj.desktop.ui.common.isOptionsKey
 import com.shareef.videoplayersj.desktop.ui.common.ThumbnailProgressBar
 import com.shareef.videoplayersj.desktop.ui.common.VideoThumbnail
 import com.shareef.videoplayersj.desktop.ui.common.revealInFileManager
@@ -84,7 +103,24 @@ fun ShowDetailScreen(
 
     val listState = rememberLazyListState()
 
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    // Starts on the play button, so a controller user can press A straight away.
+    val playButton = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { playButton.requestFocus() } }
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .arrowKeyFocus()
+            .onKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                when (event.key) {
+                    Key.Escape, Key.Backspace -> onBack()
+                    else -> return@onKeyEvent false
+                }
+                true
+            },
+    ) {
         LazyColumn(
             state = listState,
             contentPadding = PaddingValues(start = 32.dp, end = 32.dp, bottom = 40.dp),
@@ -92,7 +128,7 @@ fun ShowDetailScreen(
         ) {
             item {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 14.dp)) {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = onBack, modifier = Modifier.focusRing(CircleShape)) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                     Text("Library", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -123,7 +159,13 @@ fun ShowDetailScreen(
                             modifier = Modifier.padding(top = 6.dp),
                         )
                         if (upNext != null) {
-                            Button(onClick = { onVideoClick(upNext) }, modifier = Modifier.padding(top = 20.dp)) {
+                            Button(
+                                onClick = { onVideoClick(upNext) },
+                                modifier = Modifier
+                                    .padding(top = 20.dp)
+                                    .focusRequester(playButton)
+                                    .focusRing(ButtonDefaults.shape),
+                            ) {
                                 Icon(Icons.Default.PlayArrow, contentDescription = null)
                                 val verb = if (upNext.positionMs > 0 && !upNext.isFinished) "Resume" else "Play"
                                 Text("$verb ${shortLabel(upNext)}", modifier = Modifier.padding(start = 6.dp))
@@ -141,6 +183,7 @@ fun ShowDetailScreen(
                                 selected = season == selectedSeason,
                                 onClick = { selectedSeason = season },
                                 label = { Text(season?.let { "Season $it" } ?: "Other") },
+                                modifier = Modifier.focusRing(FilterChipDefaults.shape),
                             )
                         }
                     }
@@ -179,14 +222,26 @@ private fun shortLabel(video: LibraryVideo): String = when {
 private fun EpisodeRow(episode: LibraryVideo, onClick: () -> Unit, contextMenu: () -> List<ContextMenuItem>) {
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
+    val focused by interactionSource.collectIsFocusedAsState()
+    val highlighted = hovered || (focused && !InputMode.isPointer)
+    var optionsOpen by remember { mutableStateOf(false) }
+    val selfFocus = remember { FocusRequester() }
+    val shape = RoundedCornerShape(12.dp)
 
     ContextMenuArea(items = contextMenu) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(if (hovered) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.background)
+                .clip(shape)
+                .background(if (highlighted) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.background)
+                .then(if (focused && !InputMode.isPointer) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape) else Modifier)
+                .onPreviewKeyEvent { event ->
+                    if (!event.isOptionsKey()) return@onPreviewKeyEvent false
+                    optionsOpen = true
+                    true
+                }
+                .focusRequester(selfFocus)
                 .hoverable(interactionSource)
                 .pointerHoverIcon(PointerIcon.Hand)
                 .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
@@ -194,7 +249,7 @@ private fun EpisodeRow(episode: LibraryVideo, onClick: () -> Unit, contextMenu: 
         ) {
             Box(Modifier.width(200.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp))) {
                 VideoThumbnail(episode.id, episode.path, Modifier.fillMaxSize())
-                if (hovered) {
+                if (highlighted) {
                     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)), contentAlignment = Alignment.Center) {
                         Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(40.dp))
                     }
@@ -203,6 +258,7 @@ private fun EpisodeRow(episode: LibraryVideo, onClick: () -> Unit, contextMenu: 
                 if (progress != null && !episode.isFinished) {
                     ThumbnailProgressBar(progress, Modifier.align(Alignment.BottomCenter))
                 }
+                if (optionsOpen) OptionsDropdown(expanded = true, items = contextMenu(), onDismiss = { optionsOpen = false }, returnFocusTo = selfFocus)
             }
             Column(Modifier.weight(1f).padding(horizontal = 20.dp)) {
                 Text(

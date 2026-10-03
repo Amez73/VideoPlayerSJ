@@ -72,6 +72,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.shareef.videoplayersj.desktop.data.LibraryRepository
+import com.shareef.videoplayersj.desktop.input.GamepadButton
 import com.shareef.videoplayersj.desktop.model.LibraryVideo
 import com.shareef.videoplayersj.desktop.playback.MAX_VOLUME
 import com.shareef.videoplayersj.desktop.playback.PlayerController
@@ -91,9 +92,13 @@ private val BlankPointer = PointerIcon(
     Toolkit.getDefaultToolkit().createCustomCursor(BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB), Point(0, 0), "blank"),
 )
 
-/** Lets the window route key presses to whichever screen currently wants them. */
+/**
+ * Lets the window route key presses and controller buttons to whichever screen currently wants
+ * them. Controller buttons a screen doesn't take are turned into key presses instead.
+ */
 class KeyHandlerHost {
     var handler: ((KeyEvent) -> Boolean)? = null
+    var gamepadHandler: ((GamepadButton) -> Boolean)? = null
 }
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -104,6 +109,7 @@ fun PlayerScreen(
     repository: LibraryRepository,
     keyHandlerHost: KeyHandlerHost,
     isFullscreen: Boolean,
+    escapeExitsFullscreen: Boolean,
     onToggleFullscreen: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -146,42 +152,79 @@ fun PlayerScreen(
 
     val playNext: () -> Unit = { nextEpisode?.let { video = it } }
 
-    DisposableEffect(keyHandlerHost, nextEpisode, isFullscreen) {
+    fun skipBack() {
+        controller.skip(-SKIP_MS)
+        showFlash("− 10s")
+    }
+    fun skipForward() {
+        controller.skip(SKIP_MS)
+        showFlash("+ 10s")
+    }
+    fun changeVolume(delta: Int) {
+        controller.setVolume(controller.state.value.volume + delta)
+        showFlash("Volume ${controller.state.value.volume}%")
+    }
+    fun toggleMute() {
+        controller.toggleMute()
+        val current = controller.state.value
+        showFlash(if (current.isMuted) "Muted" else "Volume ${current.volume}%")
+    }
+    // Steps through the subtitle tracks, since the track menu needs a mouse.
+    fun cycleSubtitles() {
+        val current = controller.state.value
+        val tracks = current.subtitleTracks
+        if (tracks.isEmpty()) {
+            showFlash("No subtitles")
+            return
+        }
+        val next = tracks[(tracks.indexOfFirst { it.id == current.selectedSubtitleTrack } + 1) % tracks.size]
+        controller.selectSubtitleTrack(next.id)
+        showFlash("Subtitles: ${next.name}")
+    }
+
+    DisposableEffect(keyHandlerHost, nextEpisode, isFullscreen, escapeExitsFullscreen) {
         keyHandlerHost.handler = handler@{ event ->
             if (event.type != KeyEventType.KeyDown) return@handler false
-            val current = controller.state.value
             when (event.key) {
                 Key.Spacebar, Key.K -> controller.togglePlayPause()
-                Key.DirectionLeft, Key.J -> {
-                    controller.skip(-SKIP_MS)
-                    showFlash("− 10s")
-                }
-                Key.DirectionRight, Key.L -> {
-                    controller.skip(SKIP_MS)
-                    showFlash("+ 10s")
-                }
-                Key.DirectionUp -> {
-                    controller.setVolume(current.volume + VOLUME_STEP)
-                    showFlash("Volume ${controller.state.value.volume}%")
-                }
-                Key.DirectionDown -> {
-                    controller.setVolume(current.volume - VOLUME_STEP)
-                    showFlash("Volume ${controller.state.value.volume}%")
-                }
-                Key.M -> {
-                    controller.toggleMute()
-                    showFlash(if (controller.state.value.isMuted) "Muted" else "Volume ${current.volume}%")
-                }
+                Key.DirectionLeft, Key.J -> skipBack()
+                Key.DirectionRight, Key.L -> skipForward()
+                Key.DirectionUp -> changeVolume(VOLUME_STEP)
+                Key.DirectionDown -> changeVolume(-VOLUME_STEP)
+                Key.M -> toggleMute()
                 Key.F, Key.Enter -> onToggleFullscreen()
                 Key.N -> playNext()
-                Key.Escape -> if (isFullscreen) onToggleFullscreen() else onBack()
+                Key.Escape -> if (isFullscreen && escapeExitsFullscreen) onToggleFullscreen() else onBack()
                 Key.Backspace -> onBack()
                 else -> return@handler false
             }
             poke()
             true
         }
-        onDispose { keyHandlerHost.handler = null }
+        keyHandlerHost.gamepadHandler = handler@{ button ->
+            val current = controller.state.value
+            when (button) {
+                GamepadButton.A -> when {
+                    current.hasEnded && nextEpisode != null -> playNext()
+                    else -> controller.togglePlayPause()
+                }
+                GamepadButton.B -> onBack()
+                GamepadButton.X -> cycleSubtitles()
+                GamepadButton.Y -> if (nextEpisode != null) playNext() else showFlash("No next episode")
+                GamepadButton.Left, GamepadButton.LeftTrigger -> skipBack()
+                GamepadButton.Right, GamepadButton.RightTrigger -> skipForward()
+                GamepadButton.Up, GamepadButton.RightBumper -> changeVolume(VOLUME_STEP)
+                GamepadButton.Down, GamepadButton.LeftBumper -> changeVolume(-VOLUME_STEP)
+                GamepadButton.Back -> toggleMute()
+                GamepadButton.Start -> onToggleFullscreen()
+            }
+            poke()
+            true
+        }
+        onDispose {
+            keyHandlerHost.handler = null
+            keyHandlerHost.gamepadHandler = null
+        }
     }
 
     Box(
