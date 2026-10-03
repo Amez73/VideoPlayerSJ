@@ -17,6 +17,7 @@ composeMultiplatform = "1.12.1"
 composeMaterial3 = "1.9.0"
 composeMaterialIcons = "1.7.3"
 vlcj = "4.12.1"
+jamepad = "2.30.0.0"
 kotlinxSerialization = "1.11.0"
 
 [libraries]
@@ -56,6 +57,7 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 compose-material3 = { group = "org.jetbrains.compose.material3", name = "material3", version.ref = "composeMaterial3" }
 compose-material-icons-extended = { group = "org.jetbrains.compose.material", name = "material-icons-extended", version.ref = "composeMaterialIcons" }
 vlcj = { group = "uk.co.caprica", name = "vlcj", version.ref = "vlcj" }
+jamepad = { group = "com.badlogicgames.jamepad", name = "jamepad", version.ref = "jamepad" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
