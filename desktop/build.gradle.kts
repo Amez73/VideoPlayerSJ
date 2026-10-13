@@ -13,8 +13,19 @@ kotlin {
     jvmToolchain(17)
 }
 
+val hostOs = System.getProperty("os.name").lowercase()
+
 dependencies {
     implementation(project(":core"))
+    implementation(project(":torrent"))
+    // libtorrent's native build for the OS doing the packaging, like compose.desktop.currentOs.
+    implementation(
+        when {
+            hostOs.startsWith("windows") -> libs.libtorrent4j.windows
+            hostOs.contains("mac") -> libs.libtorrent4j.macos
+            else -> libs.libtorrent4j.linux
+        },
+    )
     implementation(compose.desktop.currentOs)
     implementation(libs.compose.material3)
     implementation(libs.compose.material.icons.extended)
@@ -77,12 +88,28 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Dmg, TargetFormat.Deb)
             packageName = "VideoPlayerSJ"
-            packageVersion = "1.1.1"
+            packageVersion = "1.2.0"
             description = "Plays a folder of downloaded shows and movies"
             vendor = "Shareef"
             modules("java.instrument", "jdk.unsupported")
             if (isWindowsHost) {
                 appResourcesRootDir.set(vlcResourcesRoot)
+            }
+            macOS {
+                // Lets the app be picked to open magnet links.
+                infoPlist {
+                    extraKeysRawXml = """
+                        <key>CFBundleURLTypes</key>
+                        <array>
+                            <dict>
+                                <key>CFBundleURLName</key>
+                                <string>Magnet link</string>
+                                <key>CFBundleURLSchemes</key>
+                                <array><string>magnet</string></array>
+                            </dict>
+                        </array>
+                    """.trimIndent()
+                }
             }
             windows {
                 menuGroup = "VideoPlayerSJ"

@@ -50,6 +50,8 @@ class LibraryRepository(private val store: LibraryStore, scope: CoroutineScope) 
         .map(::buildView)
         .stateIn(scope, SharingStarted.Eagerly, buildView(store.current))
 
+    fun folderPaths(): List<String> = store.current.folders.map { it.path }
+
     fun nextEpisodeAfter(videoId: Long): LibraryVideo? {
         val current = view.value
         val showId = current.videosById[videoId]?.showId ?: return null

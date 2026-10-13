@@ -1,6 +1,7 @@
 package com.shareef.videoplayersj
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
@@ -10,11 +11,13 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.shareef.videoplayersj.torrent.Magnet
 import com.shareef.videoplayersj.ui.navigation.NavGraph
 import com.shareef.videoplayersj.ui.theme.VideoPlayerSJTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 // AppCompatActivity (a FragmentActivity) rather than ComponentActivity: the Cast button's device
 // chooser is a DialogFragment and throws unless its host activity is a FragmentActivity.
@@ -32,6 +35,34 @@ class MainActivity : AppCompatActivity() {
      * UI down to just the video. */
     val isInPipMode: StateFlow<Boolean> = _isInPipMode.asStateFlow()
 
+    private val _pendingMagnets = MutableStateFlow<List<String>>(emptyList())
+    /** Magnet links opened from other apps, waiting for the "where to save" prompt. */
+    val pendingMagnets: StateFlow<List<String>> = _pendingMagnets.asStateFlow()
+
+    private val _openDownloadsRequests = MutableStateFlow(0)
+    /** Bumped when the downloads notification is tapped. */
+    val openDownloadsRequests: StateFlow<Int> = _openDownloadsRequests.asStateFlow()
+
+    fun addPendingMagnet(magnet: String) = _pendingMagnets.update { it + magnet }
+
+    fun dismissPendingMagnet() = _pendingMagnets.update { it.drop(1) }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        if (intent == null) return
+        when (intent.action) {
+            ACTION_OPEN_DOWNLOADS -> _openDownloadsRequests.update { it + 1 }
+            Intent.ACTION_VIEW -> {
+                val link = intent.dataString ?: return
+                if (Magnet.isMagnet(link)) addPendingMagnet(link)
+            }
+        }
+    }
+
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         onUserLeaveHintCallback?.invoke()
@@ -47,11 +78,17 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         requestNotificationPermissionIfNeeded()
         val appContainer = (application as VideoPlayerApp).appContainer
+        appContainer.resumeDownloadsIfAny()
+        if (savedInstanceState == null) handleIntent(intent)
         setContent {
             VideoPlayerSJTheme {
-                NavGraph(appContainer = appContainer)
+                NavGraph(appContainer = appContainer, activity = this)
             }
         }
+    }
+
+    companion object {
+        const val ACTION_OPEN_DOWNLOADS = "com.shareef.videoplayersj.OPEN_DOWNLOADS"
     }
 
     // Without this, the playback notification (and the lock-screen media controls that ride on

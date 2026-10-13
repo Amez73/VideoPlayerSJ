@@ -72,3 +72,27 @@ optionally put `--couch` in the shortcut's launch options to start in couch mode
 Run from source with `./gradlew :desktop:run`. On Windows the build downloads libVLC itself; on
 macOS/Linux install VLC first. The library is stored in `%APPDATA%\VideoPlayerSJ` (Windows),
 `~/Library/Application Support/VideoPlayerSJ` (macOS) or `~/.local/share/VideoPlayerSJ` (Linux).
+
+## Downloads (magnet links)
+
+A small torrent downloader lives behind the download icon in the library's top bar, on both
+Android and desktop. It only leeches: when a download completes, the torrent is removed and the
+files stay where you put them. Nothing is seeded afterwards.
+
+- Click or tap a magnet link and the app asks where to save it (the last folder is offered first).
+  You can also paste a magnet link on the Downloads screen.
+- Downloads can be paused, resumed or cancelled (keeping or deleting the partial files), and pick
+  up where they left off after the app restarts.
+- If the save folder is one of your library folders, the library rescans as soon as a download
+  finishes. Otherwise a finished download offers to add its folder to the library.
+
+Making it the default for magnet links:
+
+- **Windows:** on the Downloads screen, click **Set as default**. If another app already owns
+  magnet links, Windows opens Default apps so you can pick VideoPlayerSJ for MAGNET.
+- **Android:** tap a magnet link in your browser, pick VideoPlayerSJ and choose **Always**. The
+  first download asks for "all files access", which is needed to save into your own folders.
+- **macOS:** the app registers for magnet links when installed from the DMG.
+
+On Android, downloads continue in the background with a progress notification. On desktop they
+pause when the app is closed and resume on next launch.

@@ -8,6 +8,8 @@ import java.io.File
 data class AppSettings(
     /** Keeps the whole app fullscreen, for use from the couch with a controller. */
     val couchMode: Boolean = false,
+    /** Where the last torrent was saved, offered first for the next one. */
+    val lastDownloadDir: String? = null,
 )
 
 /** App preferences, kept apart from the library so either can be reset on its own. */

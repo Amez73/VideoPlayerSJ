@@ -3,6 +3,8 @@ name: Build APK
 on:
   push:
     branches: [master]
+  # Pull requests are built and tested but never published to the release.
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -40,9 +42,10 @@ jobs:
       - name: Build debug APK
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew :torrent:test assembleDebug
 
       - name: Build metadata
+        if: github.event_name != 'pull_request'
         id: meta
         run: |
           echo "sha_short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
@@ -52,6 +55,7 @@ jobs:
       # tag was first published. Put the real build time in the title/body so
       # the release card shows how fresh the APK actually is.
       - name: Update latest release
+        if: github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
@@ -83,10 +87,12 @@ jobs:
         run: ./gradlew :core:test :desktop:test :desktop:packageMsi :desktop:createDistributable
 
       - name: Zip portable build
+        if: github.event_name != 'pull_request'
         shell: pwsh
         run: Compress-Archive -Path desktop/build/compose/binaries/main/app/VideoPlayerSJ -DestinationPath VideoPlayerSJ-windows-portable.zip
 
       - name: Upload to latest release
+        if: github.event_name != 'pull_request'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
