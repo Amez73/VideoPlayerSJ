@@ -19,6 +19,7 @@ composeMaterialIcons = "1.7.3"
 vlcj = "4.12.1"
 jamepad = "2.30.0.0"
 kotlinxSerialization = "1.11.0"
+libtorrent4j = "2.1.0-39"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -57,6 +58,14 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 compose-material3 = { group = "org.jetbrains.compose.material3", name = "material3", version.ref = "composeMaterial3" }
 compose-material-icons-extended = { group = "org.jetbrains.compose.material", name = "material-icons-extended", version.ref = "composeMaterialIcons" }
 vlcj = { group = "uk.co.caprica", name = "vlcj", version.ref = "vlcj" }
+libtorrent4j = { group = "org.libtorrent4j", name = "libtorrent4j", version.ref = "libtorrent4j" }
+libtorrent4j-windows = { group = "org.libtorrent4j", name = "libtorrent4j-windows", version.ref = "libtorrent4j" }
+libtorrent4j-macos = { group = "org.libtorrent4j", name = "libtorrent4j-macos", version.ref = "libtorrent4j" }
+libtorrent4j-linux = { group = "org.libtorrent4j", name = "libtorrent4j-linux", version.ref = "libtorrent4j" }
+libtorrent4j-android-arm64 = { group = "org.libtorrent4j", name = "libtorrent4j-android-arm64", version.ref = "libtorrent4j" }
+libtorrent4j-android-arm = { group = "org.libtorrent4j", name = "libtorrent4j-android-arm", version.ref = "libtorrent4j" }
+libtorrent4j-android-x64 = { group = "org.libtorrent4j", name = "libtorrent4j-android-x86_64", version.ref = "libtorrent4j" }
+kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
 jamepad = { group = "com.badlogicgames.jamepad", name = "jamepad", version.ref = "jamepad" }
 
 [plugins]

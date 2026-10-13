@@ -35,10 +35,13 @@ import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Tv
 import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.material.icons.rounded.PlayCircle
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -121,6 +124,8 @@ fun LibraryScreen(
     isCouchMode: Boolean,
     onToggleCouchMode: () -> Unit,
     onQuit: () -> Unit,
+    activeDownloads: Int,
+    onOpenDownloads: () -> Unit,
     onShowClick: (Long) -> Unit,
     onVideoClick: (LibraryVideo) -> Unit,
 ) {
@@ -159,6 +164,8 @@ fun LibraryScreen(
             onAddFolder = addFolder,
             onToggleCouchMode = onToggleCouchMode,
             onQuit = onQuit,
+            activeDownloads = activeDownloads,
+            onOpenDownloads = onOpenDownloads,
         )
 
         if (!isVlcAvailable) VlcMissingBanner()
@@ -338,6 +345,8 @@ private fun LibraryTopBar(
     onAddFolder: () -> Unit,
     onToggleCouchMode: () -> Unit,
     onQuit: () -> Unit,
+    activeDownloads: Int,
+    onOpenDownloads: () -> Unit,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -363,6 +372,12 @@ private fun LibraryTopBar(
                 CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
             } else {
                 Icon(Icons.Default.Refresh, contentDescription = "Rescan folders")
+            }
+        }
+        val downloadsTooltip = if (activeDownloads > 0) "Downloads ($activeDownloads active)" else "Downloads"
+        TooltipIconButton(downloadsTooltip, onClick = onOpenDownloads) {
+            BadgedBox(badge = { if (activeDownloads > 0) Badge { Text("$activeDownloads") } }) {
+                Icon(Icons.Outlined.Download, contentDescription = downloadsTooltip)
             }
         }
         TooltipIconButton("Manage folders", onClick = onManageFolders) {

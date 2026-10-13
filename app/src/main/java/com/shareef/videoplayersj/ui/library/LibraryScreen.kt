@@ -10,6 +10,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -38,6 +41,7 @@ import com.shareef.videoplayersj.ui.library.components.ShowListItem
 @Composable
 fun LibraryScreen(
     appContainer: AppContainer,
+    onOpenDownloads: () -> Unit,
     onShowClick: (Long) -> Unit,
     onVideoClick: (Long) -> Unit,
 ) {
@@ -47,6 +51,7 @@ fun LibraryScreen(
         },
     )
     val uiState by viewModel.uiState.collectAsState()
+    val activeDownloads by appContainer.torrentEngine.downloads.collectAsState()
     val context = LocalContext.current
 
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -60,6 +65,11 @@ fun LibraryScreen(
             TopAppBar(
                 title = { Text("VideoPlayerSJ") },
                 actions = {
+                    IconButton(onClick = onOpenDownloads) {
+                        BadgedBox(badge = { if (activeDownloads.isNotEmpty()) Badge { Text("${activeDownloads.size}") } }) {
+                            Icon(Icons.Outlined.Download, contentDescription = "Downloads")
+                        }
+                    }
                     IconButton(onClick = { viewModel.rescan() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh")
                     }

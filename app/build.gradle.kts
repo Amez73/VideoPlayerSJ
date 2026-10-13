@@ -39,6 +39,11 @@ ksp {
 
 dependencies {
     implementation(project(":core"))
+    implementation(project(":torrent"))
+    // libtorrent's native builds: phones (arm64, older 32-bit arm) and x86_64 emulators.
+    implementation(libs.libtorrent4j.android.arm64)
+    implementation(libs.libtorrent4j.android.arm)
+    implementation(libs.libtorrent4j.android.x64)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)

@@ -8,8 +8,8 @@ import javax.swing.JFileChooser
 private val isWindows = System.getProperty("os.name").startsWith("Windows")
 
 /** Shows the native-looking folder chooser and returns the picked folder, or null if cancelled. */
-fun chooseFolder(title: String = "Choose a folder of videos"): File? {
-    val chooser = JFileChooser().apply {
+fun chooseFolder(title: String = "Choose a folder of videos", startIn: File? = null): File? {
+    val chooser = JFileChooser(startIn).apply {
         dialogTitle = title
         fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
         isAcceptAllFileFilterUsed = false
