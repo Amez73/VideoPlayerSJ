@@ -344,9 +344,9 @@ class TorrentEngine(
             status.toItem(entry.copy(name = name ?: entry.name))
         }
         if (renamed) synchronized(this) { persist() }
-        // A download may have finished or been cancelled while this snapshot was taken.
-        val current = synchronized(this) { entries.keys.toSet() }
-        _downloads.value = items.filter { it.id in current }
+        // Downloads may have been added, finished or cancelled while this snapshot was taken.
+        val byId = items.associateBy { it.id }
+        _downloads.value = synchronized(this) { entries.values.map { byId[it.id] ?: placeholderItem(it) } }
     }
 
     private fun TorrentStatus.toItem(entry: ActiveEntry): DownloadItem {
