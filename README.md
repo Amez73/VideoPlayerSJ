@@ -13,6 +13,9 @@ https://github.com/Amez73/VideoPlayerSJ/releases/latest
 
 - **Android:** on your phone, open the link above in a browser and download `app-debug.apk`.
   You may need to allow "install unknown apps" for your browser in Android settings the first time.
+  If Play Protect warns about an unknown app, tap **More details → Install anyway**. If Android
+  says the app can't be installed because it conflicts with an existing package, uninstall the old
+  copy first (this happened once, when the signing key changed in October 2026).
 - **Windows:** download `VideoPlayerSJ-Windows-Installer.msi` and double-click it, or grab
   `VideoPlayerSJ-windows-portable.zip`, unzip it anywhere and run `VideoPlayerSJ.exe`.
   VLC's playback engine is bundled, so nothing else needs installing.
