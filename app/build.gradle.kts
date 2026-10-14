@@ -16,6 +16,18 @@ android {
         versionName = "1.0"
     }
 
+    // Every build is signed with this one key, kept in the repo, so a newly downloaded APK
+    // always installs over the one already on the phone. Android refuses an update signed with
+    // a different key. It's a debug key for a sideloaded app, not a Play Store signing key.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
