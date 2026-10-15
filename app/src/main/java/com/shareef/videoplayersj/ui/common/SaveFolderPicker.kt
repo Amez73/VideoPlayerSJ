@@ -1,6 +1,7 @@
 package com.shareef.videoplayersj.ui.common
 
 import android.Manifest
+import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -47,7 +48,13 @@ fun rememberHasFileAccess(): MutableState<Boolean> {
  * directly rather than through Android's document APIs.
  */
 @Composable
-fun SaveFolderPicker(dir: File, onDirChange: (File) -> Unit, hasAccess: MutableState<Boolean>, purpose: String) {
+fun SaveFolderPicker(
+    dir: File?,
+    onDirChange: (dir: File, treeUri: Uri) -> Unit,
+    hasAccess: MutableState<Boolean>,
+    purpose: String,
+    label: String = "Save to",
+) {
     val context = LocalContext.current
     var pickError by remember { mutableStateOf<String?>(null) }
     val legacyPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -59,24 +66,26 @@ fun SaveFolderPicker(dir: File, onDirChange: (File) -> Unit, hasAccess: MutableS
         if (picked == null) {
             pickError = "That folder isn't on this device's storage. Pick one on the phone or SD card."
         } else {
-            onDirChange(picked)
+            onDirChange(picked, uri)
             pickError = null
         }
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Save to", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             Text(
-                dir.path,
+                dir?.path ?: "No folder chosen",
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
             )
         }
-        FilledTonalButton(onClick = { folderPicker.launch(StorageAccess.treeUriFor(dir)) }) { Text("Change folder") }
+        FilledTonalButton(onClick = { folderPicker.launch(dir?.let(StorageAccess::treeUriFor)) }) {
+            Text(if (dir == null) "Choose folder" else "Change folder")
+        }
         pickError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         if (!hasAccess.value) {
             Text(

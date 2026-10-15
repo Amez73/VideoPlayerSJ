@@ -221,7 +221,7 @@ fun AddTorrentDialog(magnet: String, initialDir: File, onStart: (File) -> Unit, 
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
-                SaveFolderPicker(dir = dir, onDirChange = { dir = it }, hasAccess = hasAccess, purpose = "downloads")
+                SaveFolderPicker(dir = dir, onDirChange = { picked, _ -> dir = picked }, hasAccess = hasAccess, purpose = "downloads")
                 Text(
                     "The torrent is removed as soon as it finishes; the files stay.",
                     style = MaterialTheme.typography.bodySmall,

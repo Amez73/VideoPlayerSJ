@@ -152,10 +152,19 @@ fun TransferScreen(appContainer: AppContainer, onBack: () -> Unit) {
     }
 }
 
-/** Asks whether to accept files the computer is sending, and where to put them. */
+/**
+ * Asks whether to accept files the computer is sending. They go into the library folder; with no
+ * library folder yet, the user picks one here and it becomes the library folder.
+ */
 @Composable
-fun IncomingFilesDialog(offer: IncomingOffer, initialDir: File, onAccept: (File) -> Unit, onDecline: () -> Unit) {
-    var dir by remember(offer.id) { mutableStateOf(initialDir) }
+fun IncomingFilesDialog(
+    offer: IncomingOffer,
+    libraryDir: File?,
+    onAccept: (dir: File, newLibraryFolder: Uri?) -> Unit,
+    onDecline: () -> Unit,
+) {
+    var dir by remember(offer.id) { mutableStateOf(libraryDir) }
+    var pickedTree by remember(offer.id) { mutableStateOf<Uri?>(null) }
     val hasAccess = rememberHasFileAccess()
     AlertDialog(
         onDismissRequest = {},
@@ -174,10 +183,28 @@ fun IncomingFilesDialog(offer: IncomingOffer, initialDir: File, onAccept: (File)
                         Text("and ${offer.files.size - 4} more", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                SaveFolderPicker(dir = dir, onDirChange = { dir = it }, hasAccess = hasAccess, purpose = "received files")
+                SaveFolderPicker(
+                    dir = dir,
+                    onDirChange = { picked, tree ->
+                        dir = picked
+                        pickedTree = tree
+                    },
+                    hasAccess = hasAccess,
+                    purpose = "received files",
+                    label = if (libraryDir == null) {
+                        "You haven't chosen a video folder yet. Pick one: these files go there, and it's added to your library."
+                    } else {
+                        "Saving to your video folder"
+                    },
+                )
             }
         },
-        confirmButton = { Button(onClick = { onAccept(dir) }, enabled = hasAccess.value) { Text("Accept") } },
+        confirmButton = {
+            Button(
+                onClick = { dir?.let { onAccept(it, if (libraryDir == null) pickedTree else null) } },
+                enabled = hasAccess.value && dir != null,
+            ) { Text("Accept") }
+        },
         dismissButton = { TextButton(onClick = onDecline) { Text("Decline") } },
     )
 }

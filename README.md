@@ -64,8 +64,9 @@ Switch Pro and most other USB/Bluetooth pads. Buttons are listed as Xbox / PlayS
 | View / Create | | Mute |
 | Start / Options | Fullscreen | Fullscreen |
 
-**Couch mode** (the TV button in the library) keeps the whole app fullscreen and remembers it for
-next time; a Quit button appears in the top bar while fullscreen.
+**Couch mode** (the TV button in the library) keeps the whole app fullscreen until you turn it off,
+press Esc or F11, or quit; a Quit button appears in the top bar while fullscreen. The app always
+opens in a normal window unless started with `--couch`.
 
 To launch it from **Steam Big Picture**: in Steam, *Games → Add a Non-Steam Game to My Library*,
 browse to `VideoPlayerSJ.exe` (installed to `%LOCALAPPDATA%\VideoPlayerSJ` by default), and
@@ -105,10 +106,12 @@ pause when the app is closed and resume on next launch.
 The phone-link icon in the library's top bar opens **Send files**, on both Android and desktop.
 With both devices on the same Wi-Fi and the app open on both, each sees the other in the list.
 
-- Pick a device, choose files, and the other side asks whether to accept and where to save them
-  (the last folder is offered first). Nothing is received without being accepted.
+- Pick a device, choose files, and the other side asks whether to accept. Nothing is received
+  without being accepted.
+- Received files go into your video folder (the library folder added most recently) and show up
+  in the library straight away. With no library folder yet, the prompt asks you to pick one, and
+  it becomes your library folder.
 - Files go straight between the two devices over the local network, never through the internet.
-- Files received into a library folder show up in the library straight away.
 
 If the phone never appears on Windows, allow VideoPlayerSJ through Windows Firewall for private
 networks (Windows asks the first time the app opens). On Android the phone is visible while the

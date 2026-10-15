@@ -6,8 +6,6 @@ import java.io.File
 
 @Serializable
 data class AppSettings(
-    /** Keeps the whole app fullscreen, for use from the couch with a controller. */
-    val couchMode: Boolean = false,
     /** Where the last torrent was saved, offered first for the next one. */
     val lastDownloadDir: String? = null,
     /** Identifies this computer to other copies of the app when sending files. */
