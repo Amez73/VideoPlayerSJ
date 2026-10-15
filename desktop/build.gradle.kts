@@ -18,6 +18,7 @@ val hostOs = System.getProperty("os.name").lowercase()
 dependencies {
     implementation(project(":core"))
     implementation(project(":torrent"))
+    implementation(project(":transfer"))
     // libtorrent's native build for the OS doing the packaging, like compose.desktop.currentOs.
     implementation(
         when {

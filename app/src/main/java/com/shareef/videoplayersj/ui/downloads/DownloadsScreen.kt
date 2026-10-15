@@ -1,8 +1,6 @@
 package com.shareef.videoplayersj.ui.downloads
 
-import android.Manifest
 import android.net.Uri
-import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -22,14 +20,12 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -51,9 +47,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.shareef.videoplayersj.data.saf.SafFolderScanner
 import com.shareef.videoplayersj.di.AppContainer
+import com.shareef.videoplayersj.ui.common.SaveFolderPicker
+import com.shareef.videoplayersj.ui.common.rememberHasFileAccess
 import com.shareef.videoplayersj.downloads.StorageAccess
 import com.shareef.videoplayersj.torrent.DownloadFormat
 import com.shareef.videoplayersj.torrent.DownloadItem
@@ -210,30 +207,8 @@ fun DownloadsScreen(appContainer: AppContainer, onAddMagnet: (String) -> Unit, o
  */
 @Composable
 fun AddTorrentDialog(magnet: String, initialDir: File, onStart: (File) -> Unit, onDismiss: () -> Unit) {
-    val context = LocalContext.current
     var dir by remember(magnet) { mutableStateOf(initialDir) }
-    var hasAccess by remember { mutableStateOf(StorageAccess.hasFileAccess(context)) }
-    var pickError by remember { mutableStateOf<String?>(null) }
-
-    // Coming back from the "all files access" settings page.
-    LifecycleResumeEffect(Unit) {
-        hasAccess = StorageAccess.hasFileAccess(context)
-        onPauseOrDispose { }
-    }
-
-    val legacyPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        hasAccess = granted
-    }
-    val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        val picked = StorageAccess.pathForTree(uri)
-        if (picked == null) {
-            pickError = "That folder isn't on this device's storage. Pick one on the phone or SD card."
-        } else {
-            dir = picked
-            pickError = null
-        }
-    }
+    val hasAccess = rememberHasFileAccess()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -246,33 +221,7 @@ fun AddTorrentDialog(magnet: String, initialDir: File, onStart: (File) -> Unit, 
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text("Save to", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Text(
-                        dir.path,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
-                    )
-                }
-                FilledTonalButton(onClick = { folderPicker.launch(StorageAccess.treeUriFor(dir)) }) { Text("Change folder") }
-                pickError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-                if (!hasAccess) {
-                    Text(
-                        "To save downloads into your folders, VideoPlayerSJ needs access to manage files.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                    FilledTonalButton(onClick = {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                            runCatching { context.startActivity(StorageAccess.fileAccessSettingsIntent(context)) }
-                        } else {
-                            legacyPermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                        }
-                    }) { Text("Allow file access") }
-                }
+                SaveFolderPicker(dir = dir, onDirChange = { dir = it }, hasAccess = hasAccess, purpose = "downloads")
                 Text(
                     "The torrent is removed as soon as it finishes; the files stay.",
                     style = MaterialTheme.typography.bodySmall,
@@ -280,7 +229,7 @@ fun AddTorrentDialog(magnet: String, initialDir: File, onStart: (File) -> Unit, 
                 )
             }
         },
-        confirmButton = { Button(onClick = { onStart(dir) }, enabled = hasAccess) { Text("Download") } },
+        confirmButton = { Button(onClick = { onStart(dir) }, enabled = hasAccess.value) { Text("Download") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

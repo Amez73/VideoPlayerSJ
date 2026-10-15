@@ -46,6 +46,8 @@ import com.shareef.videoplayersj.desktop.ui.player.KeyHandlerHost
 import com.shareef.videoplayersj.desktop.ui.player.PlayerScreen
 import com.shareef.videoplayersj.desktop.ui.showdetail.ShowDetailScreen
 import com.shareef.videoplayersj.desktop.ui.theme.VideoPlayerSJTheme
+import com.shareef.videoplayersj.desktop.ui.transfer.IncomingFilesDialog
+import com.shareef.videoplayersj.desktop.ui.transfer.TransferScreen
 import com.shareef.videoplayersj.torrent.Magnet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -62,6 +64,7 @@ private sealed interface Screen {
     data class ShowDetail(val showId: Long) : Screen
     data class Player(val video: LibraryVideo) : Screen
     data object Downloads : Screen
+    data object Transfer : Screen
 }
 
 /** Starts in couch mode for this run only, e.g. from a Steam shortcut's launch options. */
@@ -101,6 +104,7 @@ fun main(args: Array<String>) {
         var pendingMagnets by remember { mutableStateOf(args.filter(Magnet::isMagnet)) }
         var downloadError by remember { mutableStateOf<String?>(null) }
         val activeDownloads by container.torrentEngine.downloads.collectAsState()
+        val incomingOffers by container.localTransfer.offers.collectAsState()
 
         val isFullscreen = windowState.placement == WindowPlacement.Fullscreen
         fun setFullscreen(fullscreen: Boolean) {
@@ -186,6 +190,14 @@ fun main(args: Array<String>) {
                 }
             }
 
+            // Someone sending files is worth bringing the window forward for.
+            LaunchedEffect(incomingOffers.size) {
+                if (incomingOffers.isNotEmpty()) {
+                    if (windowState.isMinimized) windowState.isMinimized = false
+                    window.toFront()
+                }
+            }
+
             // Controller buttons go to the player when it's open; elsewhere they act as the
             // equivalent keys, so the screens' keyboard navigation handles them.
             LaunchedEffect(Unit) {
@@ -219,6 +231,7 @@ fun main(args: Array<String>) {
                                     onQuit = ::quit,
                                     activeDownloads = activeDownloads.size,
                                     onOpenDownloads = { navigate(Screen.Downloads) },
+                                    onOpenTransfer = { navigate(Screen.Transfer) },
                                     onShowClick = { navigate(Screen.ShowDetail(it)) },
                                     onVideoClick = playVideo,
                                 )
@@ -234,6 +247,12 @@ fun main(args: Array<String>) {
                                     engine = container.torrentEngine,
                                     libraryRepository = container.libraryRepository,
                                     onAddMagnet = { pendingMagnets = pendingMagnets + it },
+                                    onBack = ::goBack,
+                                )
+
+                                Screen.Transfer -> TransferScreen(
+                                    transfer = container.localTransfer,
+                                    deviceName = container.deviceName,
                                     onBack = ::goBack,
                                 )
 
@@ -260,6 +279,20 @@ fun main(args: Array<String>) {
                             onStart = { dir -> startDownload(magnet, dir) },
                             onDismiss = { pendingMagnets = pendingMagnets.drop(1) },
                         )
+                    }
+                    if (pendingMagnets.isEmpty()) {
+                        incomingOffers.firstOrNull()?.let { offer ->
+                            IncomingFilesDialog(
+                                offer = offer,
+                                initialDir = remember(offer.id) { defaultDownloadDir() },
+                                onAccept = { dir ->
+                                    container.settingsStore.update { it.copy(lastDownloadDir = dir.absolutePath) }
+                                    container.localTransfer.accept(offer.id, dir)
+                                    if (backStack.last() == Screen.Library) navigate(Screen.Transfer)
+                                },
+                                onDecline = { container.localTransfer.decline(offer.id) },
+                            )
+                        }
                     }
                     downloadError?.let { error ->
                         AlertDialog(

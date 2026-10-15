@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.PhonelinkRing
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CircularProgressIndicator
@@ -42,6 +43,7 @@ import com.shareef.videoplayersj.ui.library.components.ShowListItem
 fun LibraryScreen(
     appContainer: AppContainer,
     onOpenDownloads: () -> Unit,
+    onOpenTransfer: () -> Unit,
     onShowClick: (Long) -> Unit,
     onVideoClick: (Long) -> Unit,
 ) {
@@ -65,6 +67,9 @@ fun LibraryScreen(
             TopAppBar(
                 title = { Text("VideoPlayerSJ") },
                 actions = {
+                    IconButton(onClick = onOpenTransfer) {
+                        Icon(Icons.Outlined.PhonelinkRing, contentDescription = "Send files to your computer")
+                    }
                     IconButton(onClick = onOpenDownloads) {
                         BadgedBox(badge = { if (activeDownloads.isNotEmpty()) Badge { Text("${activeDownloads.size}") } }) {
                             Icon(Icons.Outlined.Download, contentDescription = "Downloads")

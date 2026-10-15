@@ -17,6 +17,16 @@ fun chooseFolder(title: String = "Choose a folder of videos", startIn: File? = n
     return if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) chooser.selectedFile else null
 }
 
+/** Shows the file chooser allowing several files, or an empty list if cancelled. */
+fun chooseFiles(title: String): List<File> {
+    val chooser = JFileChooser().apply {
+        dialogTitle = title
+        fileSelectionMode = JFileChooser.FILES_ONLY
+        isMultiSelectionEnabled = true
+    }
+    return if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) chooser.selectedFiles.toList() else emptyList()
+}
+
 /** Opens the file's folder in Explorer/Finder with the file selected where the OS supports it. */
 fun revealInFileManager(path: String) {
     val file = File(path)
