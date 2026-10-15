@@ -70,6 +70,12 @@ private sealed interface Screen {
 /** Starts in couch mode for this run only, e.g. from a Steam shortcut's launch options. */
 private const val COUCH_FLAG = "--couch"
 
+/**
+ * Set while a controller button is being replayed as a key, so B (sent as Escape) keeps meaning
+ * "back" in couch mode rather than leaving fullscreen. Only touched on the UI thread.
+ */
+private var replayingGamepad = false
+
 fun main(args: Array<String>) {
     // A magnet link clicked while the app is already open is handed to that window instead.
     if (!SingleInstance.claim(args.toList())) return
@@ -84,7 +90,9 @@ fun main(args: Array<String>) {
     InputMode.install()
 
     val container = AppContainer()
-    val startInCouchMode = COUCH_FLAG in args || container.settingsStore.settings.couchMode
+    // The app always opens in a normal window unless asked otherwise, so it can't get stuck
+    // fullscreen from one session to the next.
+    val startInCouchMode = COUCH_FLAG in args
 
     application {
         val windowState = rememberWindowState(
@@ -119,8 +127,12 @@ fun main(args: Array<String>) {
 
         fun toggleCouchMode() {
             isCouchMode = !isCouchMode
-            container.settingsStore.update { it.copy(couchMode = isCouchMode) }
             setFullscreen(isCouchMode)
+        }
+
+        fun leaveFullscreen() {
+            isCouchMode = false
+            setFullscreen(false)
         }
 
         fun navigate(screen: Screen) {
@@ -167,7 +179,13 @@ fun main(args: Array<String>) {
                 when {
                     keyHandlerHost.handler?.invoke(event) == true -> true
                     event.type == KeyEventType.KeyDown && event.key == Key.F11 -> {
-                        setFullscreen(!isFullscreen)
+                        if (isFullscreen) leaveFullscreen() else setFullscreen(true)
+                        true
+                    }
+                    // A fullscreen window has no title bar, so Escape must always be a way out.
+                    // The player handles its own Escape above.
+                    event.type == KeyEventType.KeyDown && event.key == Key.Escape && isFullscreen && !replayingGamepad -> {
+                        leaveFullscreen()
                         true
                     }
                     else -> false
@@ -207,8 +225,13 @@ fun main(args: Array<String>) {
                     if (keyHandlerHost.gamepadHandler?.invoke(button) == true) return@collect
                     val keyCode = button.keyCode() ?: return@collect
                     val target = window.mostRecentFocusOwner ?: window
-                    for (id in listOf(KeyEvent.KEY_PRESSED, KeyEvent.KEY_RELEASED)) {
-                        target.dispatchEvent(KeyEvent(target, id, System.currentTimeMillis(), 0, keyCode, KeyEvent.CHAR_UNDEFINED))
+                    replayingGamepad = true
+                    try {
+                        for (id in listOf(KeyEvent.KEY_PRESSED, KeyEvent.KEY_RELEASED)) {
+                            target.dispatchEvent(KeyEvent(target, id, System.currentTimeMillis(), 0, keyCode, KeyEvent.CHAR_UNDEFINED))
+                        }
+                    } finally {
+                        replayingGamepad = false
                     }
                 }
             }

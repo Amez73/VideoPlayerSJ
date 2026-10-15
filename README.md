@@ -64,8 +64,9 @@ Switch Pro and most other USB/Bluetooth pads. Buttons are listed as Xbox / PlayS
 | View / Create | | Mute |
 | Start / Options | Fullscreen | Fullscreen |
 
-**Couch mode** (the TV button in the library) keeps the whole app fullscreen and remembers it for
-next time; a Quit button appears in the top bar while fullscreen.
+**Couch mode** (the TV button in the library) keeps the whole app fullscreen until you turn it off,
+press Esc or F11, or quit; a Quit button appears in the top bar while fullscreen. The app always
+opens in a normal window unless started with `--couch`.
 
 To launch it from **Steam Big Picture**: in Steam, *Games → Add a Non-Steam Game to My Library*,
 browse to `VideoPlayerSJ.exe` (installed to `%LOCALAPPDATA%\VideoPlayerSJ` by default), and
