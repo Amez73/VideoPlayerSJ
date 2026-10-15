@@ -25,6 +25,8 @@ import com.shareef.videoplayersj.ui.library.LibraryScreen
 import com.shareef.videoplayersj.ui.player.PlayerScreen
 import com.shareef.videoplayersj.ui.player.components.MiniPlayer
 import com.shareef.videoplayersj.ui.showdetail.ShowDetailScreen
+import com.shareef.videoplayersj.ui.transfer.IncomingFilesDialog
+import com.shareef.videoplayersj.ui.transfer.TransferScreen
 
 @Composable
 fun NavGraph(
@@ -37,6 +39,7 @@ fun NavGraph(
     val onPlayerRoute = currentBackStackEntry?.destination?.route == Routes.PLAYER
     val pendingMagnets by activity.pendingMagnets.collectAsState()
     val openDownloadsRequests by activity.openDownloadsRequests.collectAsState()
+    val incomingOffers by appContainer.localTransfer.offers.collectAsState()
     val context = LocalContext.current
 
     fun openDownloads() {
@@ -66,6 +69,23 @@ fun NavGraph(
         )
     }
 
+    if (pendingMagnets.isEmpty()) {
+        incomingOffers.firstOrNull()?.let { offer ->
+            IncomingFilesDialog(
+                offer = offer,
+                initialDir = remember(offer.id) { appContainer.lastDownloadDir },
+                onAccept = { dir ->
+                    appContainer.lastDownloadDir = dir
+                    appContainer.localTransfer.accept(offer.id, dir)
+                    if (currentBackStackEntry?.destination?.route == Routes.LIBRARY) {
+                        navController.navigate(Routes.TRANSFER) { launchSingleTop = true }
+                    }
+                },
+                onDecline = { appContainer.localTransfer.decline(offer.id) },
+            )
+        }
+    }
+
     Scaffold(
         bottomBar = {
             val np = nowPlaying
@@ -92,6 +112,7 @@ fun NavGraph(
                 LibraryScreen(
                     appContainer = appContainer,
                     onOpenDownloads = { openDownloads() },
+                    onOpenTransfer = { navController.navigate(Routes.TRANSFER) { launchSingleTop = true } },
                     onShowClick = { showId -> navController.navigate(Routes.showDetail(showId)) },
                     onVideoClick = { videoId -> navController.navigate(Routes.player(videoId)) },
                 )
@@ -114,6 +135,9 @@ fun NavGraph(
                     onAddMagnet = activity::addPendingMagnet,
                     onBack = { navController.popBackStack() },
                 )
+            }
+            composable(Routes.TRANSFER) {
+                TransferScreen(appContainer = appContainer, onBack = { navController.popBackStack() })
             }
             composable(
                 route = Routes.PLAYER,

@@ -26,7 +26,7 @@ jobs:
       - name: Build debug APK
         run: |
           chmod +x gradlew
-          ./gradlew :torrent:test assembleDebug
+          ./gradlew :torrent:test :transfer:test assembleDebug
 
       - name: Build metadata
         if: github.event_name != 'pull_request'

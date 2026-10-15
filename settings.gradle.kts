@@ -18,4 +18,5 @@ rootProject.name = "VideoPlayerSJ"
 include(":app")
 include(":core")
 include(":torrent")
+include(":transfer")
 include(":desktop")

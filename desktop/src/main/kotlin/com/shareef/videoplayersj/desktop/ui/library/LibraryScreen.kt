@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.PhonelinkRing
 import androidx.compose.material.icons.outlined.Tv
 import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.material.icons.rounded.PlayCircle
@@ -126,6 +127,7 @@ fun LibraryScreen(
     onQuit: () -> Unit,
     activeDownloads: Int,
     onOpenDownloads: () -> Unit,
+    onOpenTransfer: () -> Unit,
     onShowClick: (Long) -> Unit,
     onVideoClick: (LibraryVideo) -> Unit,
 ) {
@@ -166,6 +168,7 @@ fun LibraryScreen(
             onQuit = onQuit,
             activeDownloads = activeDownloads,
             onOpenDownloads = onOpenDownloads,
+            onOpenTransfer = onOpenTransfer,
         )
 
         if (!isVlcAvailable) VlcMissingBanner()
@@ -347,6 +350,7 @@ private fun LibraryTopBar(
     onQuit: () -> Unit,
     activeDownloads: Int,
     onOpenDownloads: () -> Unit,
+    onOpenTransfer: () -> Unit,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -379,6 +383,9 @@ private fun LibraryTopBar(
             BadgedBox(badge = { if (activeDownloads > 0) Badge { Text("$activeDownloads") } }) {
                 Icon(Icons.Outlined.Download, contentDescription = downloadsTooltip)
             }
+        }
+        TooltipIconButton("Send files to your phone", onClick = onOpenTransfer) {
+            Icon(Icons.Outlined.PhonelinkRing, contentDescription = "Send files to your phone")
         }
         TooltipIconButton("Manage folders", onClick = onManageFolders) {
             Icon(Icons.Outlined.Folder, contentDescription = "Manage folders")

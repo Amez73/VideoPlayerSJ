@@ -63,6 +63,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        (application as VideoPlayerApp).appContainer.setVisibleForTransfers(true)
+    }
+
+    override fun onStop() {
+        (application as VideoPlayerApp).appContainer.setVisibleForTransfers(false)
+        super.onStop()
+    }
+
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         onUserLeaveHintCallback?.invoke()

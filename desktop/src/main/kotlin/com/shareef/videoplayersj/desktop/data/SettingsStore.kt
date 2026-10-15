@@ -10,6 +10,8 @@ data class AppSettings(
     val couchMode: Boolean = false,
     /** Where the last torrent was saved, offered first for the next one. */
     val lastDownloadDir: String? = null,
+    /** Identifies this computer to other copies of the app when sending files. */
+    val deviceId: String? = null,
 )
 
 /** App preferences, kept apart from the library so either can be reset on its own. */
