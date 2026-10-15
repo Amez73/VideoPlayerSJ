@@ -224,9 +224,11 @@ private fun TransferRow(item: Transfer, onCancel: () -> Unit) {
                 TooltipIconButton("Cancel", onClick = onCancel) {
                     Icon(Icons.Default.Close, contentDescription = "Cancel")
                 }
-            } else if (item.state == TransferState.Done && item.savedTo != null) {
-                TooltipIconButton("Show in folder", onClick = { revealInFileManager(item.savedTo) }) {
-                    Icon(Icons.Outlined.FolderOpen, contentDescription = "Show in folder")
+            } else if (item.state == TransferState.Done) {
+                item.savedTo?.let { savedTo ->
+                    TooltipIconButton("Show in folder", onClick = { revealInFileManager(savedTo) }) {
+                        Icon(Icons.Outlined.FolderOpen, contentDescription = "Show in folder")
+                    }
                 }
             }
         }
