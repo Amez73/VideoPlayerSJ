@@ -346,7 +346,8 @@ class TorrentEngine(
         if (renamed) synchronized(this) { persist() }
         // Downloads may have been added, finished or cancelled while this snapshot was taken.
         val byId = items.associateBy { it.id }
-        _downloads.value = synchronized(this) { entries.values.map { byId[it.id] ?: placeholderItem(it) } }
+        // Published under the lock, so a download that finishes meanwhile can't be put back.
+        synchronized(this) { _downloads.value = entries.values.map { byId[it.id] ?: placeholderItem(it) } }
     }
 
     private fun TorrentStatus.toItem(entry: ActiveEntry): DownloadItem {
@@ -399,9 +400,10 @@ class TorrentEngine(
 
     /** Shows additions and removals straight away rather than on the next poll. */
     private fun publishPlaceholders() {
-        val current = synchronized(this) { entries.values.toList() }
-        val known = _downloads.value.associateBy { it.id }
-        _downloads.value = current.map { known[it.id] ?: placeholderItem(it) }
+        synchronized(this) {
+            val known = _downloads.value.associateBy { it.id }
+            _downloads.value = entries.values.map { known[it.id] ?: placeholderItem(it) }
+        }
     }
 
     /** Must be called holding the lock. A few hundred bytes, so written inline. */
