@@ -1,5 +1,6 @@
 package com.shareef.videoplayersj.ui.navigation
 
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -8,6 +9,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
@@ -18,7 +20,9 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.shareef.videoplayersj.MainActivity
+import com.shareef.videoplayersj.data.saf.SafFolderScanner
 import com.shareef.videoplayersj.di.AppContainer
+import com.shareef.videoplayersj.downloads.StorageAccess
 import com.shareef.videoplayersj.ui.downloads.AddTorrentDialog
 import com.shareef.videoplayersj.ui.downloads.DownloadsScreen
 import com.shareef.videoplayersj.ui.library.LibraryScreen
@@ -27,6 +31,7 @@ import com.shareef.videoplayersj.ui.player.components.MiniPlayer
 import com.shareef.videoplayersj.ui.showdetail.ShowDetailScreen
 import com.shareef.videoplayersj.ui.transfer.IncomingFilesDialog
 import com.shareef.videoplayersj.ui.transfer.TransferScreen
+import kotlinx.coroutines.launch
 
 @Composable
 fun NavGraph(
@@ -40,6 +45,8 @@ fun NavGraph(
     val pendingMagnets by activity.pendingMagnets.collectAsState()
     val openDownloadsRequests by activity.openDownloadsRequests.collectAsState()
     val incomingOffers by appContainer.localTransfer.offers.collectAsState()
+    val libraryFolders by remember { appContainer.folderRepository.getFolders() }.collectAsState(emptyList())
+    val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
     fun openDownloads() {
@@ -73,10 +80,21 @@ fun NavGraph(
         incomingOffers.firstOrNull()?.let { offer ->
             IncomingFilesDialog(
                 offer = offer,
-                initialDir = remember(offer.id) { appContainer.lastDownloadDir },
-                onAccept = { dir ->
-                    appContainer.lastDownloadDir = dir
+                // The most recently added library folder that's a real folder on this device.
+                libraryDir = remember(offer.id, libraryFolders) {
+                    libraryFolders.sortedByDescending { it.addedAt }
+                        .firstNotNullOfOrNull { StorageAccess.pathForTree(Uri.parse(it.treeUriString)) }
+                },
+                onAccept = { dir, newLibraryFolder ->
                     appContainer.localTransfer.accept(offer.id, dir)
+                    if (newLibraryFolder != null) {
+                        scope.launch {
+                            appContainer.folderRepository.addFolder(
+                                newLibraryFolder,
+                                SafFolderScanner.displayNameForTree(context, newLibraryFolder),
+                            )
+                        }
+                    }
                     if (currentBackStackEntry?.destination?.route == Routes.LIBRARY) {
                         navController.navigate(Routes.TRANSFER) { launchSingleTop = true }
                     }

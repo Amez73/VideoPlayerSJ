@@ -153,10 +153,14 @@ fun TransferScreen(transfer: LocalTransfer, deviceName: String, onBack: () -> Un
     }
 }
 
-/** Asks whether to accept files another device is sending, and where to put them. */
+/**
+ * Asks whether to accept files another device is sending. They go into the library folder; with
+ * no library folder yet, the user picks one here and it becomes the library folder.
+ */
 @Composable
-fun IncomingFilesDialog(offer: IncomingOffer, initialDir: File, onAccept: (File) -> Unit, onDecline: () -> Unit) {
-    var dir by remember(offer.id) { mutableStateOf(initialDir) }
+fun IncomingFilesDialog(offer: IncomingOffer, libraryDir: File?, onAccept: (dir: File, addToLibrary: Boolean) -> Unit, onDecline: () -> Unit) {
+    var dir by remember(offer.id) { mutableStateOf(libraryDir) }
+    val addToLibrary = libraryDir == null
     AlertDialog(
         onDismissRequest = {},
         title = { Text("${offer.fromName} wants to send you files") },
@@ -174,17 +178,28 @@ fun IncomingFilesDialog(offer: IncomingOffer, initialDir: File, onAccept: (File)
                         Text("and ${offer.files.size - 6} more", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                Text("Save to", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    if (addToLibrary) "You haven't chosen a video folder yet. Pick one: these files go there, and it's added to your library." else "Saving to your video folder",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.FolderOpen, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Text(dir.path, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).padding(horizontal = 10.dp))
+                    Text(
+                        dir?.path ?: "No folder chosen",
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f).padding(horizontal = 10.dp),
+                    )
                     FilledTonalButton(onClick = {
-                        chooseFolder(title = "Choose where to save the files", startIn = dir)?.let { dir = it }
-                    }) { Text("Change…") }
+                        chooseFolder(title = "Choose your video folder", startIn = dir)?.let { dir = it }
+                    }) { Text(if (dir == null) "Choose…" else "Change…") }
                 }
             }
         },
-        confirmButton = { Button(onClick = { onAccept(dir) }) { Text("Accept") } },
+        confirmButton = {
+            Button(onClick = { dir?.let { onAccept(it, addToLibrary) } }, enabled = dir != null) { Text("Accept") }
+        },
         dismissButton = { TextButton(onClick = onDecline) { Text("Decline") } },
     )
 }

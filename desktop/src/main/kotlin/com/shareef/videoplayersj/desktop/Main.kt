@@ -284,10 +284,12 @@ fun main(args: Array<String>) {
                         incomingOffers.firstOrNull()?.let { offer ->
                             IncomingFilesDialog(
                                 offer = offer,
-                                initialDir = remember(offer.id) { defaultDownloadDir() },
-                                onAccept = { dir ->
-                                    container.settingsStore.update { it.copy(lastDownloadDir = dir.absolutePath) }
+                                libraryDir = remember(offer.id) {
+                                    container.libraryRepository.folderPaths().asReversed().map(::File).firstOrNull { it.isDirectory }
+                                },
+                                onAccept = { dir, addToLibrary ->
                                     container.localTransfer.accept(offer.id, dir)
+                                    if (addToLibrary) container.scope.launch { container.libraryRepository.addFolder(dir) }
                                     if (backStack.last() == Screen.Library) navigate(Screen.Transfer)
                                 },
                                 onDecline = { container.localTransfer.decline(offer.id) },
